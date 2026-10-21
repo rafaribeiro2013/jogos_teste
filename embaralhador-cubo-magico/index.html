@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CubeScramble 3D — Simulador Visual de Embaralhamento 3x3 e 2x2</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+
+  <!-- Three.js + OrbitControls via ES Module Import Map -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    window.THREE = THREE;
+    window.OrbitControls = OrbitControls;
+    window.dispatchEvent(new Event('three-ready'));
+  </script>
+  <script defer src="js/app.js"></script>
+</head>
+<body>
+  <!-- Top Header -->
+  <header class="app-header">
+    <div class="brand">
+      <div class="brand-icon" aria-hidden="true">
+        <span></span><span></span><span></span><span></span>
+      </div>
+      <div class="brand-text">
+        <h1>CubeScramble 3D</h1>
+        <p>Simulador Interativo de Embaralhamento WCA (3x3 &amp; 2x2)</p>
+      </div>
+    </div>
+
+    <div class="header-controls">
+      <!-- Cube Type Switcher -->
+      <div class="cube-selector" role="group" aria-label="Escolher tipo de cubo">
+        <button type="button" class="cube-type-btn active" data-size="3">
+          <span>🧊 Cubo 3x3x3</span>
+        </button>
+        <button type="button" class="cube-type-btn" data-size="2">
+          <span>🎲 Cubo 2x2x2</span>
+        </button>
+      </div>
+
+      <button type="button" id="btn-new-scramble" class="btn btn-primary">
+        🔀 Novo Embaralhamento
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Content: Left = 3D Interactive Cube, Right = Step-by-Step Notation Guide -->
+  <main class="app-main">
+    <!-- Left Panel: 3D Cube Viewport -->
+    <section class="viewport-panel" aria-label="Visualização 3D do Cubo Mágico">
+      <div class="viewport-top-bar">
+        <div class="orientation-badge">
+          <div class="orientation-badge-title">
+            🧭 Orientação Oficial WCA (Arraste para girar em 3D)
+          </div>
+          <div class="face-legend">
+            <span class="face-pill"><i class="color-dot" style="background:#ffffff"></i> U: Topo</span>
+            <span class="face-pill"><i class="color-dot" style="background:#009b48"></i> F: Frente</span>
+            <span class="face-pill"><i class="color-dot" style="background:#b71234"></i> R: Direita</span>
+            <span class="face-pill"><i class="color-dot" style="background:#ffd500"></i> D: Base</span>
+            <span class="face-pill"><i class="color-dot" style="background:#ff5800"></i> L: Esquerda</span>
+            <span class="face-pill"><i class="color-dot" style="background:#0046ad"></i> B: Trás</span>
+          </div>
+        </div>
+
+        <div class="viewport-actions">
+          <button type="button" id="btn-toggle-arrow" class="btn btn-sm" title="Mostrar/ocultar seta 3D indicando a direção do próximo movimento">
+            🧭 Seta Guia 3D: ON
+          </button>
+          <button type="button" id="btn-toggle-labels" class="btn btn-sm" title="Mostrar/ocultar rótulos das faces no espaço 3D">
+            🏷️ Rótulos 3D: ON
+          </button>
+          <button type="button" id="btn-reset-camera" class="btn btn-sm" title="Voltar câmera para o ângulo padrão">
+            🎥 Resetar Câmera
+          </button>
+        </div>
+      </div>
+
+      <!-- WebGL Canvas Container -->
+      <div id="canvas-container"></div>
+
+      <!-- Current / Next Move Floating Highlight -->
+      <div class="active-move-banner">
+        <div id="active-move-symbol" class="active-move-symbol">R</div>
+        <div class="active-move-details">
+          <span id="active-move-step-label" class="active-move-step-label">PRÓXIMO MOVIMENTO</span>
+          <span id="active-move-desc" class="active-move-desc">Carregando sequência...</span>
+        </div>
+      </div>
+
+      <!-- Manual Interactive Moves Bar -->
+      <div class="manual-controls-bar">
+        <span class="manual-label">🎮 Giro Manual 3D:</span>
+        <div class="manual-buttons">
+          <button type="button" class="move-key-btn" data-move="U" title="Topo 90° Horário">U</button>
+          <button type="button" class="move-key-btn" data-move="U'" title="Topo 90° Anti-horário">U'</button>
+          <button type="button" class="move-key-btn" data-move="D" title="Base 90° Horário">D</button>
+          <button type="button" class="move-key-btn" data-move="D'" title="Base 90° Anti-horário">D'</button>
+          <button type="button" class="move-key-btn" data-move="R" title="Direita 90° Horário">R</button>
+          <button type="button" class="move-key-btn" data-move="R'" title="Direita 90° Anti-horário">R'</button>
+          <button type="button" class="move-key-btn" data-move="L" title="Esquerda 90° Horário">L</button>
+          <button type="button" class="move-key-btn" data-move="L'" title="Esquerda 90° Anti-horário">L'</button>
+          <button type="button" class="move-key-btn" data-move="F" title="Frente 90° Horário">F</button>
+          <button type="button" class="move-key-btn" data-move="F'" title="Frente 90° Anti-horário">F'</button>
+          <button type="button" class="move-key-btn" data-move="B" title="Trás 90° Horário">B</button>
+          <button type="button" class="move-key-btn" data-move="B'" title="Trás 90° Anti-horário">B'</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right Panel: Scramble Sequence & Step-by-Step Instructions -->
+    <aside class="scramble-panel" aria-label="Sequência de Embaralhamento e Passo a Passo">
+      <!-- Scramble Sequence Card -->
+      <div class="panel-card">
+        <div class="card-header">
+          <div class="card-title">
+            📋 Algoritmo de Embaralhamento (Notação WCA)
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span id="scramble-count-badge" class="badge">Cubo 3x3 • 20 Movimentos</span>
+            <button type="button" id="btn-copy-scramble" class="btn btn-sm" title="Copiar algoritmo">
+              📋 Copiar
+            </button>
+          </div>
+        </div>
+
+        <div id="scramble-string-box" class="scramble-string-box"></div>
+
+        <!-- Playback Controls -->
+        <div class="playback-controls">
+          <div class="playback-buttons">
+            <button type="button" id="btn-step-start" class="btn playback-btn" title="Voltar ao cubo resolvido (Início)">
+              ⏮ Início
+            </button>
+            <button type="button" id="btn-step-prev" class="btn playback-btn" title="Desfazer passo (Seta Esquerda)">
+              ◀ Anterior
+            </button>
+            <button type="button" id="btn-play-pause" class="btn playback-btn play-main" title="Reproduzir ou pausar passo a passo (Espaço)">
+              ▶ Reproduzir
+            </button>
+            <button type="button" id="btn-step-next" class="btn playback-btn" title="Executar próximo passo (Seta Direita)">
+              Próximo ▶
+            </button>
+            <button type="button" id="btn-step-end" class="btn playback-btn" title="Ir para o estado final embaralhado">
+              Fim ⏭
+            </button>
+          </div>
+
+          <div class="progress-row">
+            <span id="progress-text">Progresso: 0 / 20 passos concluídos</span>
+            <div class="progress-bar-track">
+              <div id="progress-fill" class="progress-bar-fill"></div>
+            </div>
+          </div>
+
+          <div class="speed-row">
+            <span>⚡ Velocidade da animação:</span>
+            <input type="range" id="speed-slider" min="0.5" max="3.0" step="0.1" value="1.0" />
+            <strong id="speed-value">1.0x</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step-by-Step Interactive Guide Card -->
+      <div class="panel-card" style="flex:1;min-height:0;">
+        <div class="card-header">
+          <div class="card-title">
+            👣 Passo a Passo Detalhado (Clique em qualquer passo)
+          </div>
+          <span style="font-size:0.74rem;color:var(--text-secondary);">
+            Atalhos: ⬅️ ➡️ ou Espaço
+          </span>
+        </div>
+
+        <div id="steps-list-container" class="steps-list-container"></div>
+      </div>
+
+      <!-- Community Notation Quick Legend -->
+      <div class="panel-card">
+        <div class="card-header">
+          <div class="card-title">
+            📖 Guia Rápido de Notação da Comunidade (WCA)
+          </div>
+        </div>
+        <div class="notation-grid">
+          <div class="notation-item">
+            <span class="notation-key">Letra</span>
+            <span>Giro de <strong>90° no sentido horário</strong> olhando para a respectiva face (ex: <code>R</code>, <code>U</code>, <code>F</code>).</span>
+          </div>
+          <div class="notation-item">
+            <span class="notation-key">'</span>
+            <span><strong>Apóstrofo (Linha/Prime):</strong> Giro de <strong>90° anti-horário</strong> olhando para a face (ex: <code>R'</code>, <code>U'</code>).</span>
+          </div>
+          <div class="notation-item">
+            <span class="notation-key">2</span>
+            <span><strong>Duplo:</strong> Giro de <strong>180°</strong> (meia-volta completa) naquela face (ex: <code>R2</code>, <code>F2</code>, <code>U2</code>).</span>
+          </div>
+          <div class="notation-item">
+            <span class="notation-key">Posição</span>
+            <span>Segure o cubo com o centro <strong>Verde na Frente (F)</strong> e o <strong>Branco no Topo (U)</strong> ao iniciar.</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </main>
+</body>
+</html>
+
