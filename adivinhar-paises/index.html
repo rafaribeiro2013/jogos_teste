@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🌍 Atlas Quiz — Adivinhe os Países no Mapa-Múndi</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <!-- BARRA SUPERIOR DE CONTROLE E PLACAR -->
+    <header class="top-header">
+      <div class="header-row controls-row">
+        <div class="brand">
+          <span class="brand-icon">🌍</span>
+          <div>
+            <h1>Atlas Quiz</h1>
+            <span class="brand-subtitle">Desafio do Mapa-Múndi</span>
+          </div>
+        </div>
+
+        <div class="config-group">
+          <label for="select-modo">
+            <span class="label-title">REGIÃO</span>
+            <select id="select-modo">
+              <option value="Mundo Inteiro">Mundo Inteiro (197)</option>
+              <option value="América do Sul">América do Sul (12)</option>
+              <option value="América do Norte e Central">América do Norte e Central (23)</option>
+              <option value="Américas">Américas (35)</option>
+              <option value="Europa">Europa (45)</option>
+              <option value="África">África (54)</option>
+              <option value="Ásia">Ásia (49)</option>
+              <option value="Oceania">Oceania (14)</option>
+            </select>
+          </label>
+
+          <label for="select-tempo">
+            <span class="label-title">TEMPO</span>
+            <select id="select-tempo">
+              <option value="900">15 min (Padrão)</option>
+              <option value="1200">20 min (Tranquilo)</option>
+              <option value="600">10 min (Desafio)</option>
+              <option value="300">5 min (Rápido)</option>
+              <option value="180">3 min (Relâmpago)</option>
+              <option value="60">1 min (Teste Rápido)</option>
+              <option value="0">Sem Limite (Treino)</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="action-buttons">
+          <button id="btn-iniciar" class="btn btn-primary" title="Começar a partida e iniciar o cronômetro">
+            ▶️ Iniciar Jogo
+          </button>
+          <button id="btn-resetar" class="btn btn-secondary" title="Zerar partida e voltar para preparação">
+            🔄 Resetar
+          </button>
+          <button id="btn-pausar" class="btn btn-neutral" disabled title="Pausar ou retomar a partida">
+            ⏸️ Pausar
+          </button>
+          <button id="btn-dica" class="btn btn-warning" disabled title="Destacar um país faltante e mostrar dica (Atalho: F1)">
+            💡 Dica (F1)
+          </button>
+          <button id="btn-encerrar" class="btn btn-danger" disabled title="Encerrar agora e pintar os países não adivinhados de vermelho">
+            🏳️ Encerrar e Ver Faltantes
+          </button>
+        </div>
+
+        <div class="hud-stats">
+          <div class="stat-box score-box" title="Países acertados / Total na região">
+            <span class="stat-label">ACERTOS</span>
+            <span id="lbl-placar" class="stat-value score-val">0 / 197 <small>(0%)</small></span>
+          </div>
+          <div class="stat-box timer-box" title="Tempo restante">
+            <span class="stat-label">TEMPO</span>
+            <span id="lbl-cronometro" class="stat-value timer-val">15:00</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- LINHA DE DIGITAÇÃO E PROGRESSO -->
+      <div class="header-row input-row">
+        <div class="input-wrapper">
+          <span class="input-icon">✍️</span>
+          <input
+            type="text"
+            id="input-pais"
+            placeholder="Clique em '▶️ Iniciar Jogo' para começar a digitar..."
+            autocomplete="off"
+            spellcheck="false"
+            disabled
+          />
+          <!-- Barra visual do tempo de folga automático para prefixos (ex: Guiné, Níger, Sudão) -->
+          <div id="prefix-grace-bar" class="prefix-grace-bar"></div>
+        </div>
+
+        <div id="lbl-feedback" class="feedback-banner info">
+          Escolha a região e o tempo desejados e clique em <strong>▶️ Iniciar Jogo</strong> quando quiser começar!
+        </div>
+
+        <div class="overall-progress-wrap" title="Progresso geral da partida">
+          <div class="overall-progress-track">
+            <div id="barra-progresso-geral" class="overall-progress-fill" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- ÁREA PRINCIPAL: MAPA + PAINEL LATERAL -->
+    <main class="main-workspace">
+      <!-- CONTAINER DO MAPA-MÚNDI -->
+      <section class="map-section">
+        <!-- Barra de ferramentas do mapa -->
+        <div class="map-toolbar">
+          <div class="zoom-controls">
+            <span class="toolbar-label">🗺️ CÂMERA:</span>
+            <button id="btn-zoom-in" class="btn-tool" title="Aproximar (Scroll para cima)">➕</button>
+            <button id="btn-zoom-out" class="btn-tool" title="Afastar (Scroll para baixo)">➖</button>
+            <button id="btn-zoom-reset" class="btn-tool" title="Enquadrar região atual">🌍 Visão Padrão</button>
+          </div>
+
+          <div class="continent-pills">
+            <span class="toolbar-label">Ir para:</span>
+            <button class="pill-btn" data-continent="América do Sul">Am. Sul</button>
+            <button class="pill-btn" data-continent="América do Norte e Central">Am. Norte</button>
+            <button class="pill-btn" data-continent="Europa">Europa</button>
+            <button class="pill-btn" data-continent="África">África</button>
+            <button class="pill-btn" data-continent="Ásia">Ásia</button>
+            <button class="pill-btn" data-continent="Oceania">Oceania</button>
+          </div>
+
+          <div class="map-toggles">
+            <label class="toggle-item" title="Exibir círculos clicáveis para microestados e ilhas pequenas">
+              <input type="checkbox" id="chk-ilhas" checked />
+              <span>Marcadores de ilhas/microestados</span>
+            </label>
+            <label class="toggle-item" title="Exibir nomes sobre os países já acertados ou revelados">
+              <input type="checkbox" id="chk-nomes" />
+              <span>Mostrar nomes revelados</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Viewport do SVG Vetorial -->
+        <div id="map-viewport" class="map-viewport">
+          <svg id="world-svg" class="world-svg" xmlns="http://www.w3.org/2000/svg">
+            <g id="map-camera-group">
+              <g id="layer-grid"></g>
+              <g id="layer-neutral"></g>
+              <g id="layer-countries"></g>
+              <g id="layer-pins"></g>
+              <g id="layer-labels"></g>
+            </g>
+          </svg>
+
+          <!-- Tooltip flutuante do cursor -->
+          <div id="map-tooltip" class="map-tooltip hidden"></div>
+
+          <!-- Overlay de Jogo Pausado -->
+          <div id="pause-overlay" class="map-overlay hidden">
+            <div class="overlay-card">
+              <div class="overlay-icon">⏸️</div>
+              <h2>Jogo Pausado</h2>
+              <p>O mapa está oculto enquanto o cronômetro está parado.</p>
+              <button id="btn-retomar-overlay" class="btn btn-primary">▶️ Continuar Partida</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Rodapé com Legenda do Mapa -->
+        <div class="map-footer">
+          <div class="legend-items">
+            <span class="legend-item">
+              <i class="legend-dot green"></i> Acertado (Verde)
+            </span>
+            <span class="legend-item">
+              <i class="legend-dot red"></i> Não adivinhado ao fim do tempo (Vermelho)
+            </span>
+            <span class="legend-item">
+              <i class="legend-dot gold"></i> Selecionado no mapa
+            </span>
+            <span class="legend-item">
+              <i class="legend-dot default"></i> Falta adivinhar
+            </span>
+          </div>
+          <div class="map-hints-text">
+            🖱️ <strong>Scroll:</strong> Zoom no cursor &nbsp;|&nbsp; <strong>Arrastar:</strong> Mover mapa &nbsp;|&nbsp; <strong>Clique num país:</strong> Selecionar / Dicas
+          </div>
+        </div>
+      </section>
+
+      <!-- PAINEL LATERAL DIREITO -->
+      <aside class="sidebar">
+        <!-- 1. Card de Inspeção / Dicas do País Selecionado -->
+        <div class="side-card inspect-card">
+          <div class="card-header">
+            <span class="card-tag">🎯 PAÍS SELECIONADO NO MAPA</span>
+          </div>
+          <h3 id="inspect-title" class="inspect-title">Clique em qualquer país no mapa</h3>
+          <div id="inspect-details" class="inspect-details">
+            Clique num país misterioso para destacá-lo, ver quantas letras possui, consultar sua capital ou revelar letras!
+          </div>
+          <div class="inspect-actions">
+            <button id="btn-dica-capital" class="btn btn-sm btn-neutral" title="Revelar a capital do país selecionado">
+              🏛️ Ver Capital
+            </button>
+            <button id="btn-dica-letra" class="btn btn-sm btn-neutral" title="Revelar a próxima letra do nome do país">
+              🔤 Revelar Letra
+            </button>
+            <button id="btn-zoom-selecionado" class="btn btn-sm btn-secondary" title="Centralizar e aproximar o país selecionado">
+              🔍 Zoom Nele
+            </button>
+          </div>
+        </div>
+
+        <!-- 2. Card de Progresso por Continente -->
+        <div class="side-card continents-card">
+          <div class="card-header">
+            <span class="card-tag">📊 PROGRESSO POR CONTINENTE</span>
+            <small class="card-hint">Clique para focar</small>
+          </div>
+          <div id="continents-progress-list" class="continents-list"></div>
+        </div>
+
+        <!-- 3. Card de Lista Interativa de Países -->
+        <div class="side-card countries-list-card">
+          <div class="card-header">
+            <span id="lbl-lista-titulo" class="card-tag">✅ PAÍSES ACERTADOS (0)</span>
+          </div>
+
+          <div class="list-filter-tabs">
+            <button class="tab-btn active" data-filter="todos">Todos</button>
+            <button class="tab-btn tab-green" data-filter="verdes">✅ Acertados</button>
+            <button class="tab-btn tab-red" data-filter="vermelhos">❌ Faltaram</button>
+          </div>
+
+          <div class="list-search-box">
+            <span>🔎</span>
+            <input type="text" id="input-busca-lista" placeholder="Filtrar países na lista..." />
+          </div>
+
+          <ul id="ul-lista-paises" class="countries-ul">
+            <li class="empty-list-msg">Os países acertados (e os que faltarem ao final do tempo) aparecerão aqui. Clique em qualquer um para localizá-lo no mapa!</li>
+          </ul>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <!-- MODAL DE FIM DE JOGO -->
+  <div id="endgame-modal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div id="modal-icon" class="modal-icon">⏰</div>
+      <h2 id="modal-title">Fim de Jogo!</h2>
+      <p id="modal-subtitle" class="modal-subtitle"></p>
+
+      <div class="modal-stats-grid">
+        <div class="modal-stat green">
+          <span class="m-stat-val" id="modal-acertos">0</span>
+          <span class="m-stat-lbl">✅ Acertados (Verde)</span>
+        </div>
+        <div class="modal-stat red">
+          <span class="m-stat-val" id="modal-faltaram">0</span>
+          <span class="m-stat-lbl">❌ Não Adivinhados (Vermelho)</span>
+        </div>
+        <div class="modal-stat blue">
+          <span class="m-stat-val" id="modal-precisao">0%</span>
+          <span class="m-stat-lbl">📊 Aproveitamento</span>
+        </div>
+      </div>
+
+      <p class="modal-tip">
+        💡 Todos os países que faltaram estão destacados em <strong>VERMELHO</strong> no mapa e na lista lateral. Feche este aviso para explorar o mapa livremente!
+      </p>
+
+      <div class="modal-actions">
+        <button id="btn-modal-explorar" class="btn btn-secondary">
+          🗺️ Explorar Mapa (Verdes e Vermelhos)
+        </button>
+        <button id="btn-modal-jogar-novamente" class="btn btn-primary">
+          🔄 Jogar Novamente
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/dados-paises.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
