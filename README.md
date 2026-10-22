@@ -4,7 +4,7 @@ Simulador visual interativo em 3D para embaralhamento de Cubos Mágicos **3x3x3*
 
 ## 🚀 Tecnologias Utilizadas
 - **Three.js (WebGL)**: Renderização 3D em tempo real com iluminação física (`MeshStandardMaterial`), animações suaves por interpolação cúbica e seta direcional 3D indicando o próximo movimento diretamente sobre a face ativa.
-- **OrbitControls**: Controle livre de câmera em 360° (rotação orbital e zoom) para inspecionar todos os lados do cubo a qualquer momento.
+- **TrackballControls**: Controle livre de câmera em 360° contínuos baseado em quatérnions (sem bloqueio nos polos das faces branca e amarela) e zoom para inspecionar todos os lados do cubo livremente.
 - **HTML5 + CSS3 Moderno + JavaScript (ES6+)**: Arquitetura leve, sem necessidade de build complexo, funcionando imediatamente no navegador.
 
 ## ✨ Funcionalidades

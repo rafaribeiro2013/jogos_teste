@@ -3,31 +3,31 @@
 // ============================================================================
 function initApp() {
   const THREE = window.THREE;
-  const OrbitControls = window.OrbitControls;
+  const TrackballControls = window.TrackballControls;
 
   const FACES = {
     U: {
       axis: 'y',
       sign: 1,
-      name: 'Topo (Up)',
-      colorName: 'Branco',
+      name: 'Topo',
+      colorName: 'Branca',
       hex: '#ffffff',
-      badgeText: '#0f172a',
+      badgeText: '#090d16',
       normal: new THREE.Vector3(0, 1, 0)
     },
     D: {
       axis: 'y',
       sign: -1,
-      name: 'Base (Down)',
-      colorName: 'Amarelo',
+      name: 'Base',
+      colorName: 'Amarela',
       hex: '#ffd500',
-      badgeText: '#0f172a',
+      badgeText: '#090d16',
       normal: new THREE.Vector3(0, -1, 0)
     },
     F: {
       axis: 'z',
       sign: 1,
-      name: 'Frente (Front)',
+      name: 'Frente',
       colorName: 'Verde',
       hex: '#009b48',
       badgeText: '#ffffff',
@@ -36,7 +36,7 @@ function initApp() {
     B: {
       axis: 'z',
       sign: -1,
-      name: 'Trás (Back)',
+      name: 'Trás',
       colorName: 'Azul',
       hex: '#0046ad',
       badgeText: '#ffffff',
@@ -45,8 +45,8 @@ function initApp() {
     R: {
       axis: 'x',
       sign: 1,
-      name: 'Direita (Right)',
-      colorName: 'Vermelho',
+      name: 'Direita',
+      colorName: 'Vermelha',
       hex: '#b71234',
       badgeText: '#ffffff',
       normal: new THREE.Vector3(1, 0, 0)
@@ -54,7 +54,7 @@ function initApp() {
     L: {
       axis: 'x',
       sign: -1,
-      name: 'Esquerda (Left)',
+      name: 'Esquerda',
       colorName: 'Laranja',
       hex: '#ff5800',
       badgeText: '#ffffff',
@@ -62,31 +62,26 @@ function initApp() {
     }
   };
 
-  // Parse move notation like "R", "U'", "F2"
   function parseMove(moveStr) {
     if (!moveStr) return null;
     const clean = moveStr.trim();
     if (!clean) return null;
     const faceKey = clean[0].toUpperCase();
-    const modifier = clean.slice(1); // "", "'", or "2"
+    const modifier = clean.slice(1);
     const face = FACES[faceKey];
     if (!face || !['', "'", '2'].includes(modifier)) return null;
 
-    let turns = 1; // +1 = 90° clockwise, -1 = 90° counter-clockwise, 2 = 180°
-    let directionDesc = '90° no sentido horário';
-    let shortDir = 'Horário (90°)';
+    let turns = 1;
+    let directionDesc = 'Giro de 90° no sentido horário';
 
     if (modifier === "'") {
       turns = -1;
-      directionDesc = '90° no sentido anti-horário';
-      shortDir = 'Anti-horário (90°)';
+      directionDesc = 'Giro de 90° no sentido anti-horário';
     } else if (modifier === '2') {
       turns = 2;
       directionDesc = 'Giro duplo de 180°';
-      shortDir = 'Duplo (180°)';
     }
 
-    // Angle in radians around the positive coordinate axis
     const angleRad = -face.sign * turns * (Math.PI / 2);
 
     return {
@@ -96,13 +91,11 @@ function initApp() {
       face,
       turns,
       angleRad,
-      title: `Face ${face.name} — ${face.colorName}`,
-      description: `Gire a face ${face.name.toLowerCase()} (${face.colorName.toLowerCase()}) ${directionDesc}`,
-      shortDir
+      title: `Face ${face.name} (${face.colorName})`,
+      description: directionDesc
     };
   }
 
-  // Return the inverse move notation (e.g. R -> R', U' -> U, F2 -> F2)
   function invertMoveNotation(moveStr) {
     const clean = moveStr.trim();
     const faceKey = clean[0].toUpperCase();
@@ -112,9 +105,7 @@ function initApp() {
     return `${faceKey}'`;
   }
 
-  // Generate WCA-style scramble
   function generateScramble(cubeSize) {
-    // Official WCA 2x2 scrambles use U, R, F (11 moves) and 3x3 uses U, D, R, L, F, B (20 moves)
     const allowedFaces = cubeSize === 2 ? ['U', 'R', 'F'] : ['U', 'D', 'R', 'L', 'F', 'B'];
     const modifiers = ['', "'", '2'];
     const length = cubeSize === 2 ? 11 : 20;
@@ -145,23 +136,21 @@ function initApp() {
   }
 
   // ==========================================================================
-  // 3D RUBIK'S CUBE SIMULATOR CLASS
+  // 3D RUBIK'S CUBE SIMULATOR
   // ==========================================================================
   class RubiksSimulator {
     constructor() {
       this.container = document.getElementById('canvas-container');
-      this.cubeSize = 3; // 3 for 3x3, 2 for 2x2
+      this.cubeSize = 3;
       this.cubies = [];
       this.isAnimating = false;
       this.animationQueue = [];
-      this.animationDuration = 340; // ms per move
+      this.animationDuration = 340;
 
-      // Scramble state
       this.scrambleMoves = [];
-      this.currentStepIndex = 0; // 0 = solved, scrambleMoves.length = fully scrambled
+      this.currentStepIndex = 0;
       this.isPlaying = false;
       this.show3DLabels = true;
-      this.show3DArrow = true;
 
       this.initThree();
       this.initFaceLabels();
@@ -186,61 +175,45 @@ function initApp() {
       this.renderer.outputColorSpace = THREE.SRGBColorSpace;
       this.container.appendChild(this.renderer.domElement);
 
-      // OrbitControls so the user can freely rotate and inspect the 3D cube
-      this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-      this.controls.enableDamping = true;
-      this.controls.dampingFactor = 0.07;
-      this.controls.enablePan = false;
+      // TrackballControls allows unrestricted 360° rotation in all axes
+      this.controls = new TrackballControls(this.camera, this.renderer.domElement);
+      this.controls.rotateSpeed = 3.2;
+      this.controls.zoomSpeed = 1.2;
+      this.controls.noPan = true;
+      this.controls.staticMoving = false;
+      this.controls.dynamicDampingFactor = 0.12;
       this.controls.minDistance = 4.2;
       this.controls.maxDistance = 14;
 
-      // Studio Lighting for realistic glossy stickers & dark core plastic
-      const ambientLight = new THREE.AmbientLight(0xffffff, 1.45);
+      // Balanced 360° lighting
+      const ambientLight = new THREE.AmbientLight(0xffffff, 1.55);
       this.scene.add(ambientLight);
 
-      const keyLight = new THREE.DirectionalLight(0xffffff, 1.7);
+      const keyLight = new THREE.DirectionalLight(0xffffff, 1.4);
       keyLight.position.set(8, 12, 10);
       this.scene.add(keyLight);
 
-      const fillLight = new THREE.DirectionalLight(0x93c5fd, 0.8);
-      fillLight.position.set(-10, -8, -8);
+      const fillLight = new THREE.DirectionalLight(0xffffff, 1.1);
+      fillLight.position.set(-10, -12, -10);
       this.scene.add(fillLight);
 
-      const rimLight = new THREE.DirectionalLight(0xffffff, 0.55);
+      const rimLight = new THREE.DirectionalLight(0x93c5fd, 0.65);
       rimLight.position.set(0, -10, 8);
       this.scene.add(rimLight);
 
-      // Root group for the cube
       this.cubeGroup = new THREE.Group();
       this.scene.add(this.cubeGroup);
 
-      // Pivot group used during active face rotation
       this.pivotGroup = new THREE.Group();
       this.cubeGroup.add(this.pivotGroup);
 
-      // 3D Directional Arrow Group for indicating the next move directly on the cube
       this.arrowGroup = new THREE.Group();
       this.scene.add(this.arrowGroup);
-
-      // Subtle 3D floor shadow / ring
-      const ringGeo = new THREE.RingGeometry(1.8, 2.6, 64);
-      const ringMat = new THREE.MeshBasicMaterial({
-        color: 0x38bdf8,
-        side: THREE.DoubleSide,
-        transparent: true,
-        opacity: 0.08
-      });
-      this.floorRing = new THREE.Mesh(ringGeo, ringMat);
-      this.floorRing.rotation.x = Math.PI / 2;
-      this.floorRing.position.y = -2.55;
-      this.scene.add(this.floorRing);
 
       window.addEventListener('resize', () => this.onResize());
     }
 
-    // Build a 3D curved arrow hovering on the face of the next move
     update3DMoveIndicator() {
-      // Clear previous children
       while (this.arrowGroup.children.length > 0) {
         const child = this.arrowGroup.children[0];
         if (child.geometry) child.geometry.dispose();
@@ -248,9 +221,7 @@ function initApp() {
         this.arrowGroup.remove(child);
       }
 
-      if (!this.show3DArrow || this.currentStepIndex >= this.scrambleMoves.length) {
-        return;
-      }
+      if (this.currentStepIndex >= this.scrambleMoves.length) return;
 
       const parsed = parseMove(this.scrambleMoves[this.currentStepIndex]);
       if (!parsed) return;
@@ -262,16 +233,11 @@ function initApp() {
         face.axis === 'z' ? 1 : 0
       );
 
-      // Pick a perpendicular radius vector on the face plane
       const radius = 1.05;
-      let perpVec;
-      if (face.axis === 'y') {
-        perpVec = new THREE.Vector3(0, 0, radius);
-      } else if (face.axis === 'x') {
-        perpVec = new THREE.Vector3(0, radius, 0);
-      } else {
-        perpVec = new THREE.Vector3(0, radius, 0);
-      }
+      const perpVec =
+        face.axis === 'y'
+          ? new THREE.Vector3(0, 0, radius)
+          : new THREE.Vector3(0, radius, 0);
 
       const faceDist = 1.72;
       const totalSweep = Math.abs(turns) === 2 ? angleRad * 0.85 : angleRad * 1.15;
@@ -288,26 +254,24 @@ function initApp() {
       }
 
       const curve = new THREE.CatmullRomCurve3(curvePoints);
-      const tubeGeo = new THREE.TubeGeometry(curve, 32, 0.065, 12, false);
+      const tubeGeo = new THREE.TubeGeometry(curve, 32, 0.06, 12, false);
       const arrowColor = Math.abs(turns) === 2 ? 0xf59e0b : 0x38bdf8;
       const tubeMat = new THREE.MeshBasicMaterial({
         color: arrowColor,
         transparent: true,
-        opacity: 0.92
+        opacity: 0.9
       });
-      const tubeMesh = new THREE.Mesh(tubeGeo, tubeMat);
-      this.arrowGroup.add(tubeMesh);
+      this.arrowGroup.add(new THREE.Mesh(tubeGeo, tubeMat));
 
-      // Cone arrowhead at the end of the curve
       const endPoint = curvePoints[curvePoints.length - 1];
       const prevPoint = curvePoints[curvePoints.length - 3];
       const tangent = new THREE.Vector3().subVectors(endPoint, prevPoint).normalize();
 
-      const coneGeo = new THREE.ConeGeometry(0.17, 0.36, 16);
+      const coneGeo = new THREE.ConeGeometry(0.16, 0.34, 16);
       const coneMat = new THREE.MeshBasicMaterial({
         color: arrowColor,
         transparent: true,
-        opacity: 0.96
+        opacity: 0.95
       });
       const coneMesh = new THREE.Mesh(coneGeo, coneMat);
       coneMesh.position.copy(endPoint).addScaledVector(tangent, 0.1);
@@ -317,19 +281,20 @@ function initApp() {
 
     initFaceLabels() {
       this.labelElements = {};
+      const dist = 2.15;
       const labelSpecs = [
-        { key: 'U', text: 'U • Topo', pos: new THREE.Vector3(0, 2.25, 0) },
-        { key: 'D', text: 'D • Base', pos: new THREE.Vector3(0, -2.25, 0) },
-        { key: 'F', text: 'F • Frente', pos: new THREE.Vector3(0, 0, 2.25) },
-        { key: 'B', text: 'B • Trás', pos: new THREE.Vector3(0, 0, -2.25) },
-        { key: 'R', text: 'R • Direita', pos: new THREE.Vector3(2.25, 0, 0) },
-        { key: 'L', text: 'L • Esquerda', pos: new THREE.Vector3(-2.25, 0, 0) }
+        { key: 'U', pos: new THREE.Vector3(0, dist, 0) },
+        { key: 'D', pos: new THREE.Vector3(0, -dist, 0) },
+        { key: 'F', pos: new THREE.Vector3(0, 0, dist) },
+        { key: 'B', pos: new THREE.Vector3(0, 0, -dist) },
+        { key: 'R', pos: new THREE.Vector3(dist, 0, 0) },
+        { key: 'L', pos: new THREE.Vector3(-dist, 0, 0) }
       ];
 
       labelSpecs.forEach((spec) => {
         const el = document.createElement('div');
         el.className = 'face-3d-label';
-        el.innerHTML = `<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${FACES[spec.key].hex};margin-right:5px;vertical-align:middle;"></span>${spec.text}`;
+        el.innerHTML = `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${FACES[spec.key].hex};margin-right:5px;vertical-align:middle;"></span>${spec.key}`;
         this.container.appendChild(el);
         this.labelElements[spec.key] = { el, worldPos: spec.pos };
       });
@@ -350,10 +315,9 @@ function initApp() {
         const x = (projected.x * 0.5 + 0.5) * width;
         const y = (-projected.y * 0.5 + 0.5) * height;
 
-        // Fade slightly if the face is pointing away from the camera
         camDir.subVectors(this.camera.position, item.worldPos).normalize();
         const dot = FACES[key].normal.dot(camDir);
-        const opacity = dot > -0.15 ? '0.92' : '0.25';
+        const opacity = dot > 0 ? '0.88' : '0.18';
 
         item.el.style.left = `${x}px`;
         item.el.style.top = `${y}px`;
@@ -362,16 +326,18 @@ function initApp() {
     }
 
     resetCameraPosition(smooth = true) {
-      // Standard ergonomic speedcubing view: Front (Green) + Up (White) + Right (Red) clearly visible
       const targetPos = new THREE.Vector3(4.8, 3.9, 5.6);
+      const targetUp = new THREE.Vector3(0, 1, 0);
       if (!smooth) {
         this.camera.position.copy(targetPos);
+        this.camera.up.copy(targetUp);
         this.camera.lookAt(0, 0, 0);
         if (this.controls) this.controls.update();
         return;
       }
 
       const startPos = this.camera.position.clone();
+      const startUp = this.camera.up.clone();
       const startTime = performance.now();
       const duration = 420;
 
@@ -379,6 +345,7 @@ function initApp() {
         const t = Math.min(1, (now - startTime) / duration);
         const ease = 1 - Math.pow(1 - t, 3);
         this.camera.position.lerpVectors(startPos, targetPos, ease);
+        this.camera.up.lerpVectors(startUp, targetUp, ease).normalize();
         this.controls.target.set(0, 0, 0);
         this.controls.update();
         if (t < 1) requestAnimationFrame(tick);
@@ -386,7 +353,6 @@ function initApp() {
       requestAnimationFrame(tick);
     }
 
-    // Create a single cubie mesh with dark plastic body + colored stickers
     createCubie(logicalX, logicalY, logicalZ, maxCoord, spacing) {
       const cubieGroup = new THREE.Group();
 
@@ -397,8 +363,7 @@ function initApp() {
         roughness: 0.32,
         metalness: 0.15
       });
-      const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
-      cubieGroup.add(bodyMesh);
+      cubieGroup.add(new THREE.Mesh(bodyGeo, bodyMat));
 
       const stickerSize = bodySize * 0.85;
       const stickerThickness = 0.026;
@@ -440,8 +405,7 @@ function initApp() {
       );
 
       cubieGroup.userData = {
-        logicalPos: new THREE.Vector3(logicalX, logicalY, logicalZ),
-        initialLogicalPos: new THREE.Vector3(logicalX, logicalY, logicalZ)
+        logicalPos: new THREE.Vector3(logicalX, logicalY, logicalZ)
       };
 
       return cubieGroup;
@@ -449,11 +413,9 @@ function initApp() {
 
     buildCube(size) {
       this.cubeSize = size;
-      // Clear existing cubies
       this.cubies.forEach((c) => this.cubeGroup.remove(c));
       this.cubies = [];
 
-      // Keep total visual size consistent between 2x2 and 3x3
       this.spacing = size === 3 ? 1.02 : 1.42;
       const coords = size === 3 ? [-1, 0, 1] : [-0.5, 0.5];
       const maxCoord = size === 3 ? 1 : 0.5;
@@ -469,14 +431,12 @@ function initApp() {
       }
     }
 
-    // Reset cube immediately to solved state
     resetCubeToSolved() {
       this.animationQueue = [];
       this.isAnimating = false;
       this.buildCube(this.cubeSize);
     }
 
-    // Apply a move immediately without animation (used for instant jumping to a step)
     applyMoveInstant(moveStr) {
       const parsed = parseMove(moveStr);
       if (!parsed) return;
@@ -507,7 +467,6 @@ function initApp() {
       });
     }
 
-    // Animate a single move smoothly in 3D
     animateMove(moveStr, duration = this.animationDuration, onComplete = null) {
       const parsed = parseMove(moveStr);
       if (!parsed) {
@@ -528,7 +487,6 @@ function initApp() {
         face.axis === 'z' ? 1 : 0
       );
 
-      // Select cubies belonging to the active layer
       const activeCubies = this.cubies.filter(
         (c) => c.userData.logicalPos[face.axis] * face.sign > 0.1
       );
@@ -541,7 +499,6 @@ function initApp() {
 
       const stepAnim = (now) => {
         const t = Math.min(1, (now - startTime) / duration);
-        // Cubic ease-in-out
         const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 
         this.pivotGroup.rotation[face.axis] = angleRad * ease;
@@ -583,7 +540,7 @@ function initApp() {
     }
 
     // ========================================================================
-    // SCRAMBLE & PLAYBACK LOGIC
+    // SCRAMBLE & PLAYBACK
     // ========================================================================
     createNewScramble(customMoves = null) {
       this.stopAutoPlay();
@@ -667,109 +624,64 @@ function initApp() {
       playBtn.innerHTML = this.isPlaying ? '⏸ Pausar' : '▶ Reproduzir';
     }
 
-    // ========================================================================
-    // DOM & UI RENDERING
-    // ========================================================================
     renderScrambleUI() {
       const total = this.scrambleMoves.length;
       const current = this.currentStepIndex;
 
-      // Update 3D arrow indicator on the cube
       this.update3DMoveIndicator();
 
-      // 1. Update Scramble Count Badge
-      const countBadge = document.getElementById('scramble-count-badge');
-      if (countBadge) {
-        countBadge.textContent = `Cubo ${this.cubeSize}x${this.cubeSize} • ${total} Movimentos WCA`;
+      // 1. Spotlight Card
+      const symbolEl = document.getElementById('active-move-symbol');
+      const stepLabelEl = document.getElementById('active-move-step-label');
+      const titleEl = document.getElementById('active-move-title');
+      const descEl = document.getElementById('active-move-desc');
+
+      if (current < total) {
+        const nextMove = parseMove(this.scrambleMoves[current]);
+        symbolEl.textContent = nextMove.notation;
+        symbolEl.style.background = nextMove.face.hex;
+        symbolEl.style.color = nextMove.face.badgeText;
+        stepLabelEl.textContent = `PASSO ${current + 1} DE ${total}`;
+        titleEl.textContent = nextMove.title;
+        descEl.textContent = nextMove.description;
+      } else {
+        symbolEl.textContent = '✓';
+        symbolEl.style.background = '#22c55e';
+        symbolEl.style.color = '#052e16';
+        stepLabelEl.textContent = `CONCLUÍDO (${total}/${total})`;
+        titleEl.textContent = 'Cubo Embaralhado!';
+        descEl.textContent = 'Todos os movimentos foram aplicados.';
       }
 
-      // 2. Render Top Scramble String Tokens
-      const stringBox = document.getElementById('scramble-string-box');
-      stringBox.innerHTML = '';
-      this.scrambleMoves.forEach((mv, idx) => {
-        const span = document.createElement('span');
-        span.className = 'scramble-token';
-        if (idx < current) {
-          span.classList.add('done');
-        } else if (idx === current) {
-          span.classList.add('current');
-        }
-        span.textContent = mv;
-        span.title = `Clique para ir até o passo ${idx + 1} (${mv})`;
-        span.addEventListener('click', () => this.jumpToStep(idx + 1));
-        stringBox.appendChild(span);
-      });
-
-      // 3. Progress bar & counter
-      const progressText = document.getElementById('progress-text');
+      // 2. Progress Bar
       const progressFill = document.getElementById('progress-fill');
-      if (progressText) {
-        progressText.textContent = `Progresso: ${current} / ${total} passos concluídos`;
-      }
       if (progressFill) {
         const pct = total > 0 ? (current / total) * 100 : 0;
         progressFill.style.width = `${pct}%`;
       }
 
-      // 4. Update Floating 3D Viewport Banner for Current/Next Move
-      const bannerSymbol = document.getElementById('active-move-symbol');
-      const bannerLabel = document.getElementById('active-move-step-label');
-      const bannerDesc = document.getElementById('active-move-desc');
-
-      if (current < total) {
-        const nextMove = parseMove(this.scrambleMoves[current]);
-        bannerSymbol.textContent = nextMove.notation;
-        bannerSymbol.style.background = FACES[nextMove.faceKey].hex;
-        bannerSymbol.style.color = FACES[nextMove.faceKey].badgeText;
-        bannerSymbol.style.borderColor = 'rgba(255,255,255,0.35)';
-        bannerLabel.textContent = `PRÓXIMO MOVIMENTO (PASSO ${current + 1} DE ${total})`;
-        bannerDesc.textContent = nextMove.description;
-      } else {
-        bannerSymbol.textContent = '✓';
-        bannerSymbol.style.background = '#22c55e';
-        bannerSymbol.style.color = '#052e16';
-        bannerLabel.textContent = `EMBARALHAMENTO CONCLUÍDO (${total}/${total})`;
-        bannerDesc.textContent = 'O cubo 3D está 100% embaralhado conforme a sequência!';
-      }
-
-      // 5. Render Detailed Step-by-Step Cards
-      const stepsContainer = document.getElementById('steps-list-container');
-      stepsContainer.innerHTML = '';
+      // 3. Unified Steps Grid
+      const stepsGrid = document.getElementById('steps-grid');
+      stepsGrid.innerHTML = '';
 
       this.scrambleMoves.forEach((mv, idx) => {
-        const parsed = parseMove(mv);
-        const item = document.createElement('div');
-        item.className = 'step-item';
+        const chip = document.createElement('div');
+        chip.className = 'step-chip';
 
-        const isCompleted = idx < current;
-        const isCurrent = idx === current;
+        if (idx < current) chip.classList.add('done');
+        else if (idx === current) chip.classList.add('current');
 
-        if (isCompleted) item.classList.add('completed');
-        if (isCurrent) item.classList.add('active');
-
-        item.innerHTML = `
-          <span class="step-num">#${String(idx + 1).padStart(2, '0')}</span>
-          <div class="step-notation-badge" style="background:${parsed.face.hex};color:${parsed.face.badgeText}">
-            ${parsed.notation}
-          </div>
-          <div class="step-info">
-            <div class="step-title">${parsed.title}</div>
-            <div class="step-subtitle">${parsed.description}</div>
-          </div>
-          <div class="step-status-icon">
-            ${isCompleted ? '✓ Feito' : isCurrent ? '▶ Agora' : 'Pendente'}
-          </div>
+        chip.innerHTML = `
+          <span class="step-chip-num">${idx + 1}</span>
+          <span class="step-chip-move">${mv}</span>
         `;
 
-        item.addEventListener('click', () => this.jumpToStep(idx + 1));
-        stepsContainer.appendChild(item);
-
-        if (isCurrent) {
-          item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
+        chip.title = `Ir para o passo ${idx + 1} (${mv})`;
+        chip.addEventListener('click', () => this.jumpToStep(idx + 1));
+        stepsGrid.appendChild(chip);
       });
 
-      // Enable/disable navigation buttons appropriately
+      // 4. Playback Buttons State
       document.getElementById('btn-step-start').disabled = current === 0;
       document.getElementById('btn-step-prev').disabled = current === 0;
       document.getElementById('btn-step-next').disabled = current >= total;
@@ -777,7 +689,6 @@ function initApp() {
     }
 
     bindUI() {
-      // Cube Type Selector (3x3 vs 2x2)
       document.querySelectorAll('.cube-type-btn').forEach((btn) => {
         btn.addEventListener('click', () => {
           const size = parseInt(btn.dataset.size, 10);
@@ -791,25 +702,22 @@ function initApp() {
         });
       });
 
-      // Generate New Scramble Button
       document.getElementById('btn-new-scramble').addEventListener('click', () => {
         this.createNewScramble();
       });
 
-      // Copy Scramble to Clipboard
       const copyBtn = document.getElementById('btn-copy-scramble');
       copyBtn.addEventListener('click', () => {
         const text = this.scrambleMoves.join(' ');
         navigator.clipboard.writeText(text).then(() => {
-          const orig = copyBtn.innerHTML;
-          copyBtn.innerHTML = '✓ Copiado!';
+          const orig = copyBtn.textContent;
+          copyBtn.textContent = 'Copiado!';
           setTimeout(() => {
-            copyBtn.innerHTML = orig;
-          }, 1600);
+            copyBtn.textContent = orig;
+          }, 1500);
         });
       });
 
-      // Playback Buttons
       document.getElementById('btn-step-start').addEventListener('click', () => this.jumpToStep(0));
       document.getElementById('btn-step-prev').addEventListener('click', () => this.stepBackward());
       document.getElementById('btn-play-pause').addEventListener('click', () => this.toggleAutoPlay());
@@ -821,7 +729,6 @@ function initApp() {
         this.jumpToStep(this.scrambleMoves.length);
       });
 
-      // Animation Speed Slider
       const speedSlider = document.getElementById('speed-slider');
       const speedValue = document.getElementById('speed-value');
       speedSlider.addEventListener('input', (e) => {
@@ -830,7 +737,6 @@ function initApp() {
         speedValue.textContent = `${val.toFixed(1)}x`;
       });
 
-      // Viewport Camera Reset & Label/Arrow Toggles
       document.getElementById('btn-reset-camera').addEventListener('click', () => {
         this.resetCameraPosition(true);
       });
@@ -838,32 +744,9 @@ function initApp() {
       const toggleLabelsBtn = document.getElementById('btn-toggle-labels');
       toggleLabelsBtn.addEventListener('click', () => {
         this.show3DLabels = !this.show3DLabels;
-        toggleLabelsBtn.textContent = this.show3DLabels
-          ? '🏷️ Rótulos 3D: ON'
-          : '🏷️ Rótulos 3D: OFF';
+        toggleLabelsBtn.textContent = this.show3DLabels ? 'Rótulos: ON' : 'Rótulos: OFF';
       });
 
-      const toggleArrowBtn = document.getElementById('btn-toggle-arrow');
-      if (toggleArrowBtn) {
-        toggleArrowBtn.addEventListener('click', () => {
-          this.show3DArrow = !this.show3DArrow;
-          toggleArrowBtn.textContent = this.show3DArrow
-            ? '🧭 Seta Guia 3D: ON'
-            : '🧭 Seta Guia 3D: OFF';
-          this.update3DMoveIndicator();
-        });
-      }
-
-      // Manual Face Move Buttons in Viewport
-      document.querySelectorAll('.move-key-btn').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          this.stopAutoPlay();
-          const move = btn.dataset.move;
-          this.animateMove(move, this.animationDuration);
-        });
-      });
-
-      // Keyboard Shortcuts (ArrowRight = Next Step, ArrowLeft = Prev Step, Space = Play/Pause)
       window.addEventListener('keydown', (e) => {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
         if (e.code === 'ArrowRight') {
@@ -887,6 +770,9 @@ function initApp() {
       this.camera.aspect = width / height;
       this.camera.updateProjectionMatrix();
       this.renderer.setSize(width, height);
+      if (this.controls && this.controls.handleResize) {
+        this.controls.handleResize();
+      }
     }
 
     animate() {
@@ -900,9 +786,8 @@ function initApp() {
   window.simulator = new RubiksSimulator();
 }
 
-if (window.THREE && window.OrbitControls) {
+if (window.THREE && window.TrackballControls) {
   initApp();
 } else {
   window.addEventListener('three-ready', initApp, { once: true });
 }
-
