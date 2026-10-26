@@ -3,19 +3,42 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>🌍 Atlas Quiz — Adivinhe os Países no Mapa-Múndi</title>
+  <title>🌍 Atlas Quiz — Países e Bandeiras</title>
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
   <div class="app-shell">
-    <!-- BARRA SUPERIOR DE CONTROLE E PLACAR -->
+    <!-- BARRA SUPERIOR CLEAN -->
     <header class="top-header">
       <div class="header-row controls-row">
-        <div class="brand">
-          <span class="brand-icon">🌍</span>
-          <div>
-            <h1>Atlas Quiz</h1>
-            <span class="brand-subtitle">Desafio do Mapa-Múndi</span>
+        <div class="brand-and-tabs">
+          <div class="brand">
+            <span id="brand-icon" class="brand-icon">🌍</span>
+            <div>
+              <h1>Atlas Quiz</h1>
+              <span id="brand-subtitle" class="brand-subtitle">Mapa-Múndi</span>
+            </div>
+          </div>
+
+          <div class="game-mode-tabs" role="tablist" aria-label="Modo de jogo">
+            <button
+              id="tab-jogo-mapa"
+              class="game-mode-tab active"
+              data-game-tab="mapa"
+              role="tab"
+              aria-selected="true"
+            >
+              🗺️ Mapa
+            </button>
+            <button
+              id="tab-jogo-bandeiras"
+              class="game-mode-tab"
+              data-game-tab="bandeiras"
+              role="tab"
+              aria-selected="false"
+            >
+              🏳️ Bandeiras
+            </button>
           </div>
         </div>
 
@@ -37,41 +60,35 @@
           <label for="select-tempo">
             <span class="label-title">TEMPO</span>
             <select id="select-tempo">
-              <option value="900">15 min (Padrão)</option>
-              <option value="1200">20 min (Tranquilo)</option>
-              <option value="600">10 min (Desafio)</option>
-              <option value="300">5 min (Rápido)</option>
-              <option value="180">3 min (Relâmpago)</option>
-              <option value="60">1 min (Teste Rápido)</option>
-              <option value="0">Sem Limite (Treino)</option>
+              <option value="900">15 min</option>
+              <option value="1200">20 min</option>
+              <option value="600">10 min</option>
+              <option value="300">5 min</option>
+              <option value="180">3 min</option>
+              <option value="60">1 min</option>
+              <option value="0">Livre</option>
             </select>
           </label>
         </div>
 
         <div class="action-buttons">
-          <button id="btn-iniciar" class="btn btn-primary" title="Começar a partida e iniciar o cronômetro">
-            ▶️ Iniciar Jogo
-          </button>
-          <button id="btn-resetar" class="btn btn-secondary" title="Zerar partida e voltar para preparação">
-            🔄 Resetar
-          </button>
-          <button id="btn-pausar" class="btn btn-neutral" disabled title="Pausar ou retomar a partida">
+          <button id="btn-pausar" class="btn btn-neutral" disabled>
             ⏸️ Pausar
           </button>
-          <button id="btn-dica" class="btn btn-warning" disabled title="Destacar um país faltante e mostrar dica (Atalho: F1)">
-            💡 Dica (F1)
+          <button id="btn-resetar" class="btn btn-neutral" title="Reiniciar partida">
+            🔄 Resetar
           </button>
-          <button id="btn-encerrar" class="btn btn-danger" disabled title="Encerrar agora e pintar os países não adivinhados de vermelho">
-            🏳️ Encerrar e Ver Faltantes
+          <button id="btn-encerrar" class="btn btn-danger" disabled title="Encerrar e revelar países faltantes">
+            🏳️ Revelar
           </button>
         </div>
 
         <div class="hud-stats">
-          <div class="stat-box score-box" title="Países acertados / Total na região">
+          <div class="stat-box score-box">
             <span class="stat-label">ACERTOS</span>
             <span id="lbl-placar" class="stat-value score-val">0 / 197 <small>(0%)</small></span>
           </div>
-          <div class="stat-box timer-box" title="Tempo restante">
+          <div class="stat-box timer-box">
             <span class="stat-label">TEMPO</span>
             <span id="lbl-cronometro" class="stat-value timer-val">15:00</span>
           </div>
@@ -85,20 +102,18 @@
           <input
             type="text"
             id="input-pais"
-            placeholder="Clique em '▶️ Iniciar Jogo' para começar a digitar..."
+            placeholder="Comece a digitar um país para iniciar o tempo..."
             autocomplete="off"
             spellcheck="false"
-            disabled
           />
-          <!-- Barra visual do tempo de folga automático para prefixos (ex: Guiné, Níger, Sudão) -->
           <div id="prefix-grace-bar" class="prefix-grace-bar"></div>
         </div>
 
         <div id="lbl-feedback" class="feedback-banner info">
-          Escolha a região e o tempo desejados e clique em <strong>▶️ Iniciar Jogo</strong> quando quiser começar!
+          Comece a digitar o primeiro país para disparar o cronômetro!
         </div>
 
-        <div class="overall-progress-wrap" title="Progresso geral da partida">
+        <div class="overall-progress-wrap" title="Progresso geral">
           <div class="overall-progress-track">
             <div id="barra-progresso-geral" class="overall-progress-fill" style="width: 0%"></div>
           </div>
@@ -106,21 +121,18 @@
       </div>
     </header>
 
-    <!-- ÁREA PRINCIPAL: MAPA + PAINEL LATERAL -->
+    <!-- ÁREA PRINCIPAL -->
     <main class="main-workspace">
-      <!-- CONTAINER DO MAPA-MÚNDI -->
-      <section class="map-section">
-        <!-- Barra de ferramentas do mapa -->
+      <!-- ABA 1: MAPA-MÚNDI -->
+      <section id="map-section" class="map-section">
         <div class="map-toolbar">
           <div class="zoom-controls">
-            <span class="toolbar-label">🗺️ CÂMERA:</span>
-            <button id="btn-zoom-in" class="btn-tool" title="Aproximar (Scroll para cima)">➕</button>
-            <button id="btn-zoom-out" class="btn-tool" title="Afastar (Scroll para baixo)">➖</button>
-            <button id="btn-zoom-reset" class="btn-tool" title="Enquadrar região atual">🌍 Visão Padrão</button>
+            <button id="btn-zoom-in" class="btn-tool" title="Aproximar">➕</button>
+            <button id="btn-zoom-out" class="btn-tool" title="Afastar">➖</button>
+            <button id="btn-zoom-reset" class="btn-tool" title="Enquadrar região">🌍 Enquadrar</button>
           </div>
 
           <div class="continent-pills">
-            <span class="toolbar-label">Ir para:</span>
             <button class="pill-btn" data-continent="América do Sul">Am. Sul</button>
             <button class="pill-btn" data-continent="América do Norte e Central">Am. Norte</button>
             <button class="pill-btn" data-continent="Europa">Europa</button>
@@ -130,18 +142,17 @@
           </div>
 
           <div class="map-toggles">
-            <label class="toggle-item" title="Exibir círculos clicáveis para microestados e ilhas pequenas">
+            <label class="toggle-item">
               <input type="checkbox" id="chk-ilhas" checked />
-              <span>Marcadores de ilhas/microestados</span>
+              <span>Ilhas</span>
             </label>
-            <label class="toggle-item" title="Exibir nomes sobre os países já acertados ou revelados">
+            <label class="toggle-item">
               <input type="checkbox" id="chk-nomes" />
-              <span>Mostrar nomes revelados</span>
+              <span>Nomes no mapa</span>
             </label>
           </div>
         </div>
 
-        <!-- Viewport do SVG Vetorial -->
         <div id="map-viewport" class="map-viewport">
           <svg id="world-svg" class="world-svg" xmlns="http://www.w3.org/2000/svg">
             <g id="map-camera-group">
@@ -153,79 +164,132 @@
             </g>
           </svg>
 
-          <!-- Tooltip flutuante do cursor -->
           <div id="map-tooltip" class="map-tooltip hidden"></div>
 
-          <!-- Overlay de Jogo Pausado -->
           <div id="pause-overlay" class="map-overlay hidden">
             <div class="overlay-card">
               <div class="overlay-icon">⏸️</div>
               <h2>Jogo Pausado</h2>
               <p>O mapa está oculto enquanto o cronômetro está parado.</p>
-              <button id="btn-retomar-overlay" class="btn btn-primary">▶️ Continuar Partida</button>
+              <button id="btn-retomar-overlay" class="btn btn-primary">▶️ Continuar</button>
             </div>
           </div>
         </div>
 
-        <!-- Rodapé com Legenda do Mapa -->
         <div class="map-footer">
           <div class="legend-items">
-            <span class="legend-item">
-              <i class="legend-dot green"></i> Acertado (Verde)
-            </span>
-            <span class="legend-item">
-              <i class="legend-dot red"></i> Não adivinhado ao fim do tempo (Vermelho)
-            </span>
-            <span class="legend-item">
-              <i class="legend-dot gold"></i> Selecionado no mapa
-            </span>
-            <span class="legend-item">
-              <i class="legend-dot default"></i> Falta adivinhar
-            </span>
+            <span class="legend-item"><i class="legend-dot green"></i> Acertado</span>
+            <span class="legend-item"><i class="legend-dot red"></i> Não adivinhado</span>
+            <span class="legend-item"><i class="legend-dot default"></i> Pendente</span>
           </div>
           <div class="map-hints-text">
-            🖱️ <strong>Scroll:</strong> Zoom no cursor &nbsp;|&nbsp; <strong>Arrastar:</strong> Mover mapa &nbsp;|&nbsp; <strong>Clique num país:</strong> Selecionar / Dicas
+            Scroll: Zoom &nbsp;•&nbsp; Arrastar: Mover
           </div>
         </div>
       </section>
 
-      <!-- PAINEL LATERAL DIREITO -->
-      <aside class="sidebar">
-        <!-- 1. Card de Inspeção / Dicas do País Selecionado -->
-        <div class="side-card inspect-card">
-          <div class="card-header">
-            <span class="card-tag">🎯 PAÍS SELECIONADO NO MAPA</span>
+      <!-- ABA 2: JOGO DE ADIVINHAR BANDEIRAS -->
+      <section id="flags-section" class="flags-section hidden">
+        <div class="flags-toolbar">
+          <div class="flag-continent-pills">
+            <button class="flag-pill-btn active" data-flag-continent="Todos">Todas</button>
+            <button class="flag-pill-btn" data-flag-continent="América do Sul">Am. Sul</button>
+            <button class="flag-pill-btn" data-flag-continent="América do Norte e Central">Am. Norte</button>
+            <button class="flag-pill-btn" data-flag-continent="Europa">Europa</button>
+            <button class="flag-pill-btn" data-flag-continent="África">África</button>
+            <button class="flag-pill-btn" data-flag-continent="Ásia">Ásia</button>
+            <button class="flag-pill-btn" data-flag-continent="Oceania">Oceania</button>
           </div>
-          <h3 id="inspect-title" class="inspect-title">Clique em qualquer país no mapa</h3>
-          <div id="inspect-details" class="inspect-details">
-            Clique num país misterioso para destacá-lo, ver quantas letras possui, consultar sua capital ou revelar letras!
+
+          <div class="flags-mode-controls">
+            <button id="btn-embaralhar-bandeiras" class="btn-tool" title="Embaralhar ordem das bandeiras">
+              🔀 Embaralhar
+            </button>
+            <button id="btn-agrupar-bandeiras" class="btn-tool active" title="Agrupar por continente">
+              🌍 Continentes
+            </button>
+            <label class="flag-select-label">
+              <select id="select-modo-bandeira">
+                <option value="destaque">🎯 Bandeira Selecionada</option>
+                <option value="livre">⚡ Digitação Livre</option>
+              </select>
+            </label>
+            <label class="flag-select-label">
+              <select id="select-filtro-bandeiras">
+                <option value="todas">Exibir: Todas</option>
+                <option value="faltantes">Exibir: Pendentes</option>
+                <option value="acertadas">Exibir: Acertadas</option>
+                <option value="perdidas">Exibir: Não Adivinhadas</option>
+              </select>
+            </label>
           </div>
-          <div class="inspect-actions">
-            <button id="btn-dica-capital" class="btn btn-sm btn-neutral" title="Revelar a capital do país selecionado">
-              🏛️ Ver Capital
+        </div>
+
+        <!-- Destaque da Bandeira Selecionada -->
+        <div id="flag-spotlight-bar" class="flag-spotlight-bar">
+          <div class="spotlight-flag-wrap">
+            <img id="spotlight-flag-img" class="spotlight-flag-img" src="" alt="Bandeira em destaque" />
+          </div>
+
+          <div class="spotlight-info">
+            <div class="spotlight-title-row">
+              <span id="spotlight-status-badge" class="spotlight-badge">🎯 EM DESTAQUE</span>
+              <span id="spotlight-counter" class="spotlight-counter">1 / 197</span>
+            </div>
+            <h3 id="spotlight-title" class="spotlight-title">Qual é o país desta bandeira?</h3>
+            <p id="spotlight-meta" class="spotlight-meta">
+              Comece a digitar para iniciar o cronômetro ou navegue pelas bandeiras abaixo.
+            </p>
+          </div>
+
+          <div class="spotlight-actions">
+            <button id="btn-flag-prev" class="btn btn-sm btn-neutral" title="Bandeira anterior">
+              ⬅️ Anterior
             </button>
-            <button id="btn-dica-letra" class="btn btn-sm btn-neutral" title="Revelar a próxima letra do nome do país">
-              🔤 Revelar Letra
-            </button>
-            <button id="btn-zoom-selecionado" class="btn btn-sm btn-secondary" title="Centralizar e aproximar o país selecionado">
-              🔍 Zoom Nele
+            <button id="btn-flag-next" class="btn btn-sm btn-secondary" title="Próxima bandeira (Atalho: Tab)">
+              ➡️ Próxima (Tab)
             </button>
           </div>
         </div>
 
-        <!-- 2. Card de Progresso por Continente -->
+        <!-- Grade de Bandeiras -->
+        <div id="flags-viewport" class="flags-viewport">
+          <div id="flags-grid" class="flags-grid"></div>
+
+          <div id="flags-pause-overlay" class="map-overlay hidden">
+            <div class="overlay-card">
+              <div class="overlay-icon">⏸️</div>
+              <h2>Jogo Pausado</h2>
+              <p>As bandeiras estão ocultas enquanto o cronômetro está parado.</p>
+              <button id="btn-retomar-flags-overlay" class="btn btn-primary">▶️ Continuar</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="map-footer flags-footer">
+          <div class="legend-items">
+            <span class="legend-item"><i class="legend-dot green"></i> Acertada</span>
+            <span class="legend-item"><i class="legend-dot red"></i> Não adivinhada (revelada)</span>
+            <span class="legend-item"><i class="legend-dot gold"></i> Selecionada</span>
+          </div>
+          <div class="map-hints-text">
+            Clique numa bandeira para selecionar &nbsp;•&nbsp; Tab: Pular para a próxima
+          </div>
+        </div>
+      </section>
+
+      <!-- PAINEL LATERAL CLEAN -->
+      <aside class="sidebar">
         <div class="side-card continents-card">
           <div class="card-header">
-            <span class="card-tag">📊 PROGRESSO POR CONTINENTE</span>
-            <small class="card-hint">Clique para focar</small>
+            <span class="card-tag">📊 CONTINENTES</span>
           </div>
           <div id="continents-progress-list" class="continents-list"></div>
         </div>
 
-        <!-- 3. Card de Lista Interativa de Países -->
         <div class="side-card countries-list-card">
           <div class="card-header">
-            <span id="lbl-lista-titulo" class="card-tag">✅ PAÍSES ACERTADOS (0)</span>
+            <span id="lbl-lista-titulo" class="card-tag">✅ ACERTADOS (0)</span>
           </div>
 
           <div class="list-filter-tabs">
@@ -236,11 +300,11 @@
 
           <div class="list-search-box">
             <span>🔎</span>
-            <input type="text" id="input-busca-lista" placeholder="Filtrar países na lista..." />
+            <input type="text" id="input-busca-lista" placeholder="Buscar país..." />
           </div>
 
           <ul id="ul-lista-paises" class="countries-ul">
-            <li class="empty-list-msg">Os países acertados (e os que faltarem ao final do tempo) aparecerão aqui. Clique em qualquer um para localizá-lo no mapa!</li>
+            <li class="empty-list-msg">Os países acertados e os revelados ao fim do tempo aparecerão aqui.</li>
           </ul>
         </div>
       </aside>
@@ -257,11 +321,11 @@
       <div class="modal-stats-grid">
         <div class="modal-stat green">
           <span class="m-stat-val" id="modal-acertos">0</span>
-          <span class="m-stat-lbl">✅ Acertados (Verde)</span>
+          <span class="m-stat-lbl">✅ Acertados</span>
         </div>
         <div class="modal-stat red">
           <span class="m-stat-val" id="modal-faltaram">0</span>
-          <span class="m-stat-lbl">❌ Não Adivinhados (Vermelho)</span>
+          <span class="m-stat-lbl">❌ Não Adivinhados</span>
         </div>
         <div class="modal-stat blue">
           <span class="m-stat-val" id="modal-precisao">0%</span>
@@ -269,13 +333,13 @@
         </div>
       </div>
 
-      <p class="modal-tip">
-        💡 Todos os países que faltaram estão destacados em <strong>VERMELHO</strong> no mapa e na lista lateral. Feche este aviso para explorar o mapa livremente!
+      <p id="modal-tip" class="modal-tip">
+        Os países não adivinhados foram revelados em <strong>vermelho</strong>.
       </p>
 
       <div class="modal-actions">
         <button id="btn-modal-explorar" class="btn btn-secondary">
-          🗺️ Explorar Mapa (Verdes e Vermelhos)
+          🔍 Ver Resultado
         </button>
         <button id="btn-modal-jogar-novamente" class="btn btn-primary">
           🔄 Jogar Novamente

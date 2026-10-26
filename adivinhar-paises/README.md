@@ -1,26 +1,26 @@
-# 🌍 Atlas Quiz — Jogo de Adivinhar Países no Mapa-Múndi
+# 🌍 Atlas Quiz — Jogo de Adivinhar Países no Mapa-Múndi e Bandeiras
 
-Jogo web interativo de adivinhar países no mapa-múndi, desenvolvido com **HTML5, CSS3, JavaScript (ES6+) e JSON/SVG Vetorial**.
+Jogo web interativo com duas abas de desafio (**🗺️ Adivinhar Países no Mapa** e **🏳️ Adivinhar Bandeiras**), desenvolvido com **HTML5, CSS3, JavaScript (ES6+) e JSON/SVG Vetorial**.
 
 ## ✨ Funcionalidades Principais
 
-- **Mapa-Múndi Vetorial Interativo em Alta Definição (197 Países Soberanos)**:
+- **Duas Abas de Jogo Completas (Todos os 197 Países Soberanos)**:
+  - **🗺️ Aba 1 — Adivinhar Países no Mapa**: Mapa-múndi vetorial interativo onde cada país acertado fica **Verde (`#22c55e`)** e os países não adivinhados ao fim do tempo são destacados em **Vermelho (`#ef4444`)**.
+  - **🏳️ Aba 2 — Adivinhar Bandeiras**: Painel completo com as bandeiras de todos os 197 países (ou filtrado por região/continente), barra de bandeira em destaque, navegação rápida (`⬅️ Anterior`, `➡️ Próxima (Tab)`, `🎲 Sortear`, `🔀 Embaralhar`), modo de resposta selecionável (**🎯 Bandeira Selecionada** ou **⚡ Digitação Livre**) e cronômetro. Quando o tempo acaba (ou ao encerrar a partida), todas as bandeiras não adivinhadas ficam em **Vermelho (`#ef4444`)** e têm os nomes de seus países **revelados**.
   - **Verde (`#22c55e`)**: Países acertados piscam e ficam imediatamente verdes no mapa.
   - **Vermelho (`#ef4444`)**: Quando o tempo acaba (ou ao encerrar a partida), todos os países que não foram adivinhados ficam destacados em vermelho.
   - **Amarelo-Ouro (`#eab308`)**: País clicado/selecionado no mapa para inspeção ou pedido de dica.
   - **Marcadores de Microestados e Ilhas**: Pequenas nações insulares e microestados (como Vaticano, Mônaco, Maldivas, Tuvalu, etc.) possuem marcadores circulares clicáveis para facilitar a visualização.
-- **Início Manual pelo Jogador**:
-  - O cronômetro **não inicia automaticamente** ao abrir a página ou trocar de região/tempo.
-  - Escolha tranquilamente a região e o tempo desejados e clique em **`▶️ Iniciar Jogo`** quando quiser começar.
+- **Início Automático ao Digitar**:
+  - Não há botão de *Start*: o campo de texto já fica liberado e o cronômetro dispara automaticamente assim que o jogador começa a digitar o primeiro país.
 - **Digitação Inteligente com Tempo de Folga Automático (`850ms`)**:
   - Reconhecimento automático assim que o nome é digitado, sem exigir acentos, cedilha ou letras maiúsculas.
   - Aceita variações e sinônimos comuns em português (ex.: *EUA / Estados Unidos*, *Holanda / Países Baixos*, *República Tcheca / Tchéquia*, *Mianmar / Birmânia*, *Essuatíni / Suazilândia*, *RD Congo*, *Reino Unido / Inglaterra*, etc.).
   - **Proteção automática contra prefixos ambíguos**: Ao digitar nomes como *Guiné*, *Níger*, *Sudão* ou *Dominica*, uma barra visual de `0,85s` aguarda uma breve pausa e confirma o país automaticamente caso você pare de digitar (sem precisar apertar `Enter` ou clicar em nada), ou cancela caso você continue digitando (*Guiné-Bissau*, *Nigéria*, *Sudão do Sul*, etc.).
-- **Ferramentas de Navegação e Ajuda**:
+- **Ferramentas de Navegação**:
   - **Zoom e Pan suaves com Animação**: Use a roda do mouse (`Scroll`) para dar zoom na posição do cursor e arraste para navegar pelo mapa.
-  - **Atalhos de Continentes**: Botões rápidos na barra do mapa e no painel de progresso por continente com transição suave de câmera.
-  - **Inspeção e Dicas no Mapa (`F1`)**: Clique em qualquer país misterioso no mapa para saber quantas letras ele tem, revelar sua **Capital** (`🏛️ Ver Capital`) ou revelar letras do nome (`🔤 Revelar Letra`).
-  - **Exploração Pós-Jogo**: Ao acabar o tempo, feche o modal de resumo para explorar livremente os países verdes e vermelhos no mapa ou filtre pela lista lateral (**✅ Acertados** / **❌ Faltaram**).
+  - **Atalhos de Continentes**: Botões rápidos na barra superior e no painel de progresso por continente.
+  - **Exploração Pós-Jogo**: Ao acabar o tempo, feche o modal de resumo para explorar livremente os países e bandeiras verdes e vermelhos ou filtre pela lista lateral (**✅ Acertados** / **❌ Faltaram**).
 
 ## ▶️ Como Executar
 
