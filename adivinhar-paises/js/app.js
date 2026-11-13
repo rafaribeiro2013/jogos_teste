@@ -8,6 +8,7 @@
 
   const FATOR_LAT = 1.22;
   const TEMPO_FOLGA_PREFIXO_MS = 850;
+  const PLACEHOLDER_ENCERRADO = 'Partida encerrada — clique em Reiniciar para jogar de novo';
   const NS_SVG = 'http://www.w3.org/2000/svg';
 
   const ENQUADRAMENTOS_CONTINENTES = {
@@ -83,6 +84,16 @@
     return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
   }
 
+  function icone(nome) {
+    return `<svg class="icon"><use href="#i-${nome}"/></svg>`;
+  }
+
+  function rotuloBotaoPausa(pausado) {
+    return pausado
+      ? `${icone('play')}<span>Continuar</span>`
+      : `${icone('pause')}<span>Pausar</span>`;
+  }
+
   function embaralharArray(lista) {
     const arr = [...lista];
     for (let i = arr.length - 1; i > 0; i--) {
@@ -121,6 +132,7 @@
   let ordemAcertos = [];
 
   let paisSelecionado = null;
+  let continenteFocado = null; // continente com zoom ativo pelos botões (aba Mapa)
   let filtroListaAtual = 'todos';
 
   // Estado específico da aba de Bandeiras
@@ -226,6 +238,23 @@
     modalTip: document.getElementById('modal-tip'),
     btnModalExplorar: document.getElementById('btn-modal-explorar'),
     btnModalJogarNovamente: document.getElementById('btn-modal-jogar-novamente'),
+    modalRing: document.getElementById('modal-ring'),
+
+    scoreRing: document.getElementById('score-ring'),
+    scoreRingPct: document.getElementById('score-ring-pct'),
+    timerBarFill: document.getElementById('timer-bar-fill'),
+    mapStartHint: document.getElementById('map-start-hint'),
+
+    btnAjuda: document.getElementById('btn-ajuda'),
+    btnTema: document.getElementById('btn-tema'),
+    helpModal: document.getElementById('help-modal'),
+    btnFecharAjuda: document.getElementById('btn-fechar-ajuda'),
+    btnComecarAjuda: document.getElementById('btn-comecar-ajuda'),
+
+    confirmModal: document.getElementById('confirm-modal'),
+    confirmText: document.getElementById('confirm-text'),
+    btnConfirmCancelar: document.getElementById('btn-confirm-cancelar'),
+    btnConfirmOk: document.getElementById('btn-confirm-ok'),
   };
 
   // =========================================================================
@@ -246,7 +275,9 @@
     construirMapaSvg();
     construirBarrasContinentes();
     vincularEventos();
+    vincularEventosInterface();
     prepararPartida();
+    abrirAjudaNaPrimeiraVisita();
   }
 
   function construirIndicesNomes() {
@@ -331,12 +362,15 @@
     el.tabJogoBandeiras.classList.toggle('active', ehBandeiras);
     el.tabJogoBandeiras.setAttribute('aria-selected', String(ehBandeiras));
 
-    el.brandIcon.textContent = ehBandeiras ? '🏳️' : '🌍';
-    el.brandSubtitle.textContent = ehBandeiras ? 'Bandeiras' : 'Mapa-Múndi';
+    el.brandIcon.innerHTML = icone(ehBandeiras ? 'flag' : 'globe');
+    el.brandSubtitle.textContent = ehBandeiras ? 'Bandeiras do mundo' : 'Mapa-Múndi';
 
     el.mapSection.classList.toggle('hidden', ehBandeiras);
     el.flagsSection.classList.toggle('hidden', !ehBandeiras);
     el.endgameModal.classList.add('hidden');
+    el.confirmModal.classList.add('hidden');
+    if (ehBandeiras) ajustarCamposSelecao();
+    atualizarBotoesContinente();
 
     const salvo = estadosSalvosAbas[abaJogoAtual];
     if (salvo && (salvo.jogoAtivo || salvo.jogoEncerrado)) {
@@ -352,28 +386,29 @@
 
     if (jogoAtivo) {
       el.btnPausar.disabled = false;
-      el.btnPausar.innerHTML = jogoPausado ? '▶️ Continuar' : '⏸️ Pausar';
+      el.btnPausar.innerHTML = rotuloBotaoPausa(jogoPausado);
       el.btnEncerrar.disabled = false;
       el.inputPais.disabled = jogoPausado;
       el.inputPais.value = '';
       el.inputPais.placeholder = ehBandeiras
-        ? 'Digite o país da bandeira selecionada (ou Tab para pular)...'
-        : 'Digite o nome de qualquer país...';
+        ? 'De qual país é esta bandeira? (Tab para pular)'
+        : 'Digite o nome de qualquer país…';
     } else if (jogoEncerrado) {
       el.btnPausar.disabled = true;
-      el.btnPausar.innerHTML = '⏸️ Pausar';
+      el.btnPausar.innerHTML = rotuloBotaoPausa(false);
       el.btnEncerrar.disabled = true;
       el.inputPais.disabled = true;
       el.inputPais.value = '';
+      el.inputPais.placeholder = PLACEHOLDER_ENCERRADO;
     } else {
       el.btnPausar.disabled = true;
-      el.btnPausar.innerHTML = '⏸️ Pausar';
+      el.btnPausar.innerHTML = rotuloBotaoPausa(false);
       el.btnEncerrar.disabled = true;
       el.inputPais.disabled = false;
       el.inputPais.value = '';
       el.inputPais.placeholder = ehBandeiras
-        ? 'Comece a digitar o país da bandeira para iniciar o tempo...'
-        : 'Comece a digitar um país para iniciar o tempo...';
+        ? 'De qual país é a bandeira em destaque?'
+        : 'Digite o nome de um país para começar…';
     }
 
     el.pauseOverlay.classList.toggle('hidden', !(jogoPausado && !ehBandeiras));
@@ -386,12 +421,14 @@
       atualizarTodosEstilosMapa();
       atualizarVisibilidadePinos();
       atualizarVisibilidadeRotulos();
-      enquadrarContinente(modoAtual, false);
+      enquadrarVisaoPadrao(false);
     }
 
     atualizarPlacarEProgresso();
     definirFiltroLista(filtroListaAtual);
     atualizarDisplayCronometro();
+    atualizarDicaInicio();
+    el.btnResetar.classList.toggle('is-highlight', jogoEncerrado);
 
     if (jogoAtivo && !jogoEncerrado) {
       ultimoTickMs = performance.now();
@@ -541,12 +578,10 @@
       setTimeout(() => card.classList.remove('just-guessed'), 550);
     }
 
-    if (acertado) {
-      nameEl.textContent = `✅ ${dados.nome}`;
-    } else if (perdido) {
-      nameEl.textContent = `❌ ${dados.nome}`;
+    if (acertado || perdido) {
+      nameEl.textContent = dados.nome;
     } else {
-      nameEl.textContent = selecionado ? '🎯 Selecionada' : '???';
+      nameEl.textContent = selecionado ? 'Selecionada' : '?';
     }
   }
 
@@ -660,7 +695,7 @@
       if (primeiro) {
         el.spotlightFlagImg.src = obterUrlBandeira(primeiro, true);
       }
-      el.spotlightStatusBadge.textContent = '🏳️ BANDEIRAS';
+      el.spotlightStatusBadge.textContent = 'Bandeiras';
       el.spotlightCounter.textContent = `${paisesAcertados.size} / ${paisesEscopo.size}`;
       el.spotlightTitle.textContent = 'Selecione uma bandeira e comece a digitar';
       el.spotlightMeta.textContent =
@@ -677,24 +712,26 @@
 
     const idxNaOrdem = ordemBandeiras.indexOf(paisSelecionado) + 1;
     const faltam = Math.max(0, paisesEscopo.size - paisesAcertados.size);
-    el.spotlightCounter.textContent = `#${idxNaOrdem || 1} de ${paisesEscopo.size} • Faltam ${faltam}`;
+    el.spotlightCounter.textContent = `#${idxNaOrdem || 1} de ${paisesEscopo.size} · faltam ${faltam}`;
 
     if (paisesAcertados.has(paisSelecionado)) {
       wrap.classList.add('guessed');
       el.spotlightStatusBadge.classList.add('guessed');
-      el.spotlightStatusBadge.textContent = '✅ ACERTADA';
+      el.spotlightStatusBadge.textContent = 'Acertada';
       el.spotlightTitle.textContent = dados.nome;
-      el.spotlightMeta.textContent = `${dados.continente} • Capital: ${dados.capital}`;
+      el.spotlightMeta.textContent = `${dados.continente} · Capital: ${dados.capital}`;
     } else if (paisesPerdidos.has(paisSelecionado)) {
       wrap.classList.add('missed');
       el.spotlightStatusBadge.classList.add('missed');
-      el.spotlightStatusBadge.textContent = '❌ NÃO ADIVINHADA';
+      el.spotlightStatusBadge.textContent = 'Não adivinhada';
       el.spotlightTitle.textContent = dados.nome;
-      el.spotlightMeta.textContent = `${dados.continente} • Capital: ${dados.capital}`;
+      el.spotlightMeta.textContent = `${dados.continente} · Capital: ${dados.capital}`;
     } else {
-      el.spotlightStatusBadge.textContent = '🎯 SELECIONADA';
+      el.spotlightStatusBadge.textContent = 'Sua vez';
       el.spotlightTitle.textContent = 'Qual é o país desta bandeira?';
-      el.spotlightMeta.textContent = `Região: ${dados.continente}`;
+      el.spotlightMeta.textContent = jogoAtivo
+        ? `Dica: fica em ${dados.continente}. Não sabe? Aperte Tab para pular.`
+        : `Dica: fica em ${dados.continente}. Digite o nome do país para começar.`;
     }
   }
 
@@ -753,8 +790,8 @@
 
   function calcularTransformacaoEnquadramento(lonMin, latMin, lonMax, latMax) {
     const rect = el.mapViewport.getBoundingClientRect();
-    const largura = Math.max(300, rect.width);
-    const altura = Math.max(200, rect.height);
+    const largura = Math.max(200, rect.width);
+    const altura = Math.max(160, rect.height);
 
     const wx1 = lonMin;
     const wx2 = lonMax;
@@ -765,7 +802,7 @@
     const spanY = Math.max(3.5, wy2 - wy1);
 
     let novaEscala = Math.min((largura * 0.91) / spanX, (altura * 0.88) / spanY);
-    novaEscala = Math.max(1.8, Math.min(110.0, novaEscala));
+    novaEscala = Math.max(0.8, Math.min(110.0, novaEscala));
 
     const centroWx = (wx1 + wx2) / 2.0;
     const centroWy = (wy1 + wy2) / 2.0;
@@ -830,6 +867,39 @@
     animarCameraPara(novaEscala, novoOffsetX, novoOffsetY, animar ? 360 : 0);
   }
 
+  // Visão padrão = enquadramento da região escolhida (ex.: mundo inteiro)
+  function enquadrarVisaoPadrao(animar = true) {
+    continenteFocado = null;
+    atualizarBotoesContinente();
+    enquadrarContinente(modoAtual, animar);
+  }
+
+  // Botões de continente funcionam como liga/desliga
+  function alternarFocoContinente(cont) {
+    if (abaJogoAtual === 'bandeiras') {
+      definirFiltroContinenteBandeiras(filtroContinenteBandeira === cont ? 'Todos' : cont);
+      return;
+    }
+    if (continenteFocado === cont) {
+      enquadrarVisaoPadrao(true);
+      return;
+    }
+    continenteFocado = cont;
+    atualizarBotoesContinente();
+    enquadrarContinente(cont, true);
+  }
+
+  function atualizarBotoesContinente() {
+    document.querySelectorAll('.pill-btn').forEach((btn) => {
+      const ativo = btn.dataset.continent === continenteFocado;
+      btn.classList.toggle('active', ativo);
+      btn.setAttribute('aria-pressed', String(ativo));
+    });
+    document.querySelectorAll('.continent-row').forEach((row) => {
+      row.classList.toggle('active', abaJogoAtual === 'mapa' && row.dataset.continent === continenteFocado);
+    });
+  }
+
   function focarNoPais(codigo) {
     if (abaJogoAtual === 'bandeiras') {
       rolarParaCardBandeira(codigo);
@@ -868,7 +938,7 @@
   }
 
   function aplicarZoomPonto(sx, sy, fator) {
-    const novaEscala = Math.max(1.6, Math.min(130.0, escala * fator));
+    const novaEscala = Math.max(0.8, Math.min(130.0, escala * fator));
     const fatorReal = novaEscala / escala;
     offsetX = sx + (offsetX - sx) * fatorReal;
     offsetY = sy + (offsetY - sy) * fatorReal;
@@ -936,38 +1006,45 @@
     el.endgameModal.classList.add('hidden');
 
     el.btnPausar.disabled = true;
-    el.btnPausar.innerHTML = '⏸️ Pausar';
+    el.btnPausar.innerHTML = rotuloBotaoPausa(false);
     el.btnEncerrar.disabled = true;
 
     el.inputPais.value = '';
     el.inputPais.disabled = false;
+    el.btnResetar.classList.remove('is-highlight');
     el.inputPais.placeholder = ehBandeiras
-      ? 'Comece a digitar o país da bandeira para iniciar o tempo...'
-      : 'Comece a digitar um país para iniciar o tempo...';
+      ? 'De qual país é a bandeira em destaque?'
+      : 'Digite o nome de um país para começar…';
 
     if (ehBandeiras) {
       definirFeedback(
-        `Pronto: <strong>${modoAtual}</strong> (${paisesEscopo.size} bandeiras). Comece a digitar para disparar o cronômetro!`,
+        `<strong>${modoAtual}</strong> · ${paisesEscopo.size} bandeiras. O cronômetro começa quando você digitar.`,
         'info'
       );
       renderizarGradeBandeiras();
       atualizarSpotlightBandeira();
     } else {
       definirFeedback(
-        `Pronto: <strong>${modoAtual}</strong> (${paisesEscopo.size} países). Comece a digitar para disparar o cronômetro!`,
+        `<strong>${modoAtual}</strong> · ${paisesEscopo.size} países. O cronômetro começa quando você digitar.`,
         'info'
       );
       atualizarTodosEstilosMapa();
       atualizarVisibilidadePinos();
       atualizarVisibilidadeRotulos();
-      enquadrarContinente(modoAtual, false);
+      enquadrarVisaoPadrao(false);
     }
 
     atualizarPlacarEProgresso();
     definirFiltroLista('todos');
     atualizarDisplayCronometro();
+    atualizarDicaInicio();
     el.inputPais.focus();
     salvarEstadoAbaAtual();
+  }
+
+  function atualizarDicaInicio() {
+    const mostrar = abaJogoAtual === 'mapa' && !jogoAtivo && !jogoEncerrado;
+    el.mapStartHint.classList.toggle('hidden', !mostrar);
   }
 
   function iniciarPartidaAoDigitar() {
@@ -987,13 +1064,15 @@
     }
 
     el.inputPais.placeholder = ehBandeiras
-      ? 'Digite o país da bandeira selecionada (ou Tab para pular)...'
-      : 'Digite o nome de qualquer país...';
+      ? 'De qual país é esta bandeira? (Tab para pular)'
+      : 'Digite o nome de qualquer país…';
 
     definirFeedback(
-      `⏱️ Tempo iniciado em <strong>${modoAtual}</strong>!`,
+      `Valendo! Cronômetro iniciado em <strong>${modoAtual}</strong>.`,
       'info'
     );
+    atualizarDicaInicio();
+    if (ehBandeiras) atualizarSpotlightBandeira();
 
     ultimoTickMs = performance.now();
     timerInterval = setInterval(tickCronometro, 200);
@@ -1026,8 +1105,10 @@
 
   function atualizarDisplayCronometro() {
     el.lblCronometro.classList.remove('warning', 'danger');
+    el.timerBarFill.classList.remove('warning', 'danger');
     if (tempoTotalSeg === 0) {
-      el.lblCronometro.textContent = '∞ LIVRE';
+      el.lblCronometro.textContent = '∞';
+      el.timerBarFill.style.width = '100%';
       return;
     }
 
@@ -1035,11 +1116,14 @@
     const min = Math.floor(seg / 60);
     const remSeg = seg % 60;
     el.lblCronometro.textContent = `${String(min).padStart(2, '0')}:${String(remSeg).padStart(2, '0')}`;
+    el.timerBarFill.style.width = `${Math.max(0, (tempoRestanteSeg / tempoTotalSeg) * 100)}%`;
 
     if (seg <= 30) {
       el.lblCronometro.classList.add('danger');
+      el.timerBarFill.classList.add('danger');
     } else if (seg <= 120) {
       el.lblCronometro.classList.add('warning');
+      el.timerBarFill.classList.add('warning');
     }
   }
 
@@ -1050,7 +1134,7 @@
 
     const ehBandeiras = abaJogoAtual === 'bandeiras';
     if (jogoPausado) {
-      el.btnPausar.innerHTML = '▶️ Continuar';
+      el.btnPausar.innerHTML = rotuloBotaoPausa(true);
       el.inputPais.disabled = true;
       if (ehBandeiras) {
         el.flagsPauseOverlay.classList.remove('hidden');
@@ -1058,7 +1142,7 @@
         el.pauseOverlay.classList.remove('hidden');
       }
     } else {
-      el.btnPausar.innerHTML = '⏸️ Pausar';
+      el.btnPausar.innerHTML = rotuloBotaoPausa(false);
       el.inputPais.disabled = false;
       el.pauseOverlay.classList.add('hidden');
       el.flagsPauseOverlay.classList.add('hidden');
@@ -1146,14 +1230,14 @@
     if (!codigo || !paisesEscopo.has(codigo)) return;
 
     if (paisesAcertados.has(codigo)) {
-      definirFeedback(`ℹ️ <strong>${PAISES[codigo].nome}</strong> já foi acertado!`, 'info');
+      definirFeedback(`<strong>${PAISES[codigo].nome}</strong> já foi acertado.`, 'info');
       return;
     }
 
     if (existeOutroPaisFaltanteComPrefixo(norm, codigo)) {
       const nomeOficial = PAISES[codigo].nome;
       definirFeedback(
-        `⏳ <strong>${nomeOficial}</strong> reconhecido — confirmando após breve pausa...`,
+        `<strong>${nomeOficial}</strong>? Confirmando em instantes… (continue digitando se for outro país)`,
         'warning'
       );
 
@@ -1201,12 +1285,12 @@
       piscarInput('flash-error');
       if (outroCodigo) {
         definirFeedback(
-          `❌ Esta bandeira não é de <strong>${PAISES[outroCodigo].nome}</strong>! Tente outro país ou aperte <strong>Tab</strong> para pular.`,
+          `Não é <strong>${PAISES[outroCodigo].nome}</strong>. Tente de novo ou aperte <strong>Tab</strong> para pular.`,
           'danger'
         );
       } else {
         definirFeedback(
-          `❌ "${texto}" não corresponde à bandeira selecionada. Aperte <strong>Tab</strong> para pular.`,
+          `"${texto}" não é o país desta bandeira. Tente de novo ou aperte <strong>Tab</strong> para pular.`,
           'danger'
         );
       }
@@ -1215,7 +1299,7 @@
 
     const codigo = buscarPaisPorTexto(texto);
     if (!codigo) {
-      definirFeedback(`❌ "${texto}" não foi reconhecido como um país válido.`, 'danger');
+      definirFeedback(`"${texto}" não foi reconhecido como país. Confira a grafia.`, 'danger');
       piscarInput('flash-error');
       return;
     }
@@ -1223,14 +1307,14 @@
     if (!paisesEscopo.has(codigo)) {
       const d = PAISES[codigo];
       definirFeedback(
-        `ℹ️ <strong>${d.nome}</strong> fica na região <strong>${d.continente}</strong> (fora da região atual).`,
+        `<strong>${d.nome}</strong> fica em <strong>${d.continente}</strong>, fora da região atual.`,
         'warning'
       );
       return;
     }
 
     if (paisesAcertados.has(codigo)) {
-      definirFeedback(`ℹ️ Você já acertou <strong>${PAISES[codigo].nome}</strong>!`, 'info');
+      definirFeedback(`Você já acertou <strong>${PAISES[codigo].nome}</strong>.`, 'info');
       el.inputPais.value = '';
       return;
     }
@@ -1251,7 +1335,7 @@
     const ehBandeiras = abaJogoAtual === 'bandeiras';
 
     definirFeedback(
-      `✅ <strong>${dados.nome}</strong> (${dados.continente}) — Faltam ${restantes}!`,
+      `<strong>${dados.nome}</strong> · ${dados.continente} — faltam ${restantes}`,
       'success'
     );
 
@@ -1292,9 +1376,18 @@
     setTimeout(() => el.inputPais.classList.remove(classe), 380);
   }
 
+  const ICONES_FEEDBACK = {
+    info: 'info',
+    success: 'check',
+    warning: 'clock',
+    danger: 'alert',
+  };
+
   function definirFeedback(html, tipo = 'info') {
     el.lblFeedback.className = `feedback-banner ${tipo}`;
-    el.lblFeedback.innerHTML = html;
+    el.lblFeedback.innerHTML = `${icone(ICONES_FEEDBACK[tipo] || 'info')}<span>${html}</span>`;
+    void el.lblFeedback.offsetWidth;
+    el.lblFeedback.classList.add('pop');
   }
 
   // =========================================================================
@@ -1317,6 +1410,9 @@
     el.inputPais.disabled = true;
     el.btnPausar.disabled = true;
     el.btnEncerrar.disabled = true;
+    el.inputPais.value = '';
+    el.inputPais.placeholder = PLACEHOLDER_ENCERRADO;
+    el.btnResetar.classList.add('is-highlight');
 
     const ehBandeiras = abaJogoAtual === 'bandeiras';
     if (ehBandeiras) {
@@ -1338,16 +1434,16 @@
     const perc = total > 0 ? Math.round((acertos / total) * 100) : 0;
     const faltaram = paisesPerdidos.size;
 
-    const motivo = manual ? 'Partida encerrada!' : '⏰ O tempo acabou!';
+    const motivo = manual ? 'Partida encerrada' : 'O tempo acabou!';
     definirFeedback(
-      `${motivo} Acertados: <strong>${acertos}/${total} (${perc}%)</strong> | Não adivinhados revelados: <strong>${faltaram}</strong>.`,
+      `${manual ? 'Partida encerrada.' : 'O tempo acabou!'} Você acertou <strong>${acertos} de ${total} (${perc}%)</strong> — os ${faltaram} que faltaram estão em vermelho.`,
       'danger'
     );
 
     exibirModalFimDeJogo({
-      icone: manual ? '🏳️' : '⏰',
+      variante: manual ? 'manual' : 'tempo',
       titulo: motivo,
-      subtitulo: `${ehBandeiras ? 'Jogo das Bandeiras' : 'Jogo do Mapa'} • ${modoAtual}`,
+      subtitulo: `${ehBandeiras ? 'Jogo das Bandeiras' : 'Jogo do Mapa'} · ${modoAtual}`,
       acertos,
       faltaram,
       perc,
@@ -1366,18 +1462,21 @@
     el.inputPais.disabled = true;
     el.btnPausar.disabled = true;
     el.btnEncerrar.disabled = true;
+    el.inputPais.value = '';
+    el.inputPais.placeholder = PLACEHOLDER_ENCERRADO;
+    el.btnResetar.classList.add('is-highlight');
 
     const total = paisesEscopo.size;
     const ehBandeiras = abaJogoAtual === 'bandeiras';
 
     definirFeedback(
-      `🏆 Parabéns! Você completou 100% de <strong>${modoAtual}</strong> (${total}/${total})!`,
+      `Parabéns! Você completou 100% de <strong>${modoAtual}</strong> (${total}/${total})!`,
       'success'
     );
 
     exibirModalFimDeJogo({
-      icone: '🏆',
-      titulo: 'Vitória Completa!',
+      variante: 'vitoria',
+      titulo: 'Vitória completa!',
       subtitulo: `100% de ${modoAtual} (${ehBandeiras ? 'Bandeiras' : 'Mapa'})`,
       acertos: total,
       faltaram: 0,
@@ -1387,18 +1486,32 @@
     salvarEstadoAbaAtual();
   }
 
-  function exibirModalFimDeJogo({ icone, titulo, subtitulo, acertos, faltaram, perc }) {
+  function exibirModalFimDeJogo({ variante, titulo, subtitulo, acertos, faltaram, perc }) {
     const ehBandeiras = abaJogoAtual === 'bandeiras';
-    el.modalIcon.textContent = icone;
+    const visualModal = {
+      vitoria: { icone: 'trophy', classe: 'variant-win' },
+      tempo: { icone: 'clock', classe: 'variant-danger' },
+      manual: { icone: 'eye', classe: 'variant-primary' },
+    }[variante] || { icone: 'globe', classe: 'variant-primary' };
+    el.modalIcon.className = `modal-icon ${visualModal.classe}`;
+    el.modalIcon.innerHTML = icone(visualModal.icone);
+    el.modalRing.style.setProperty('--p', perc);
+    el.modalRing.style.setProperty(
+      '--ring-color',
+      perc >= 70 ? 'var(--green)' : perc >= 35 ? 'var(--gold)' : 'var(--red)'
+    );
     el.modalTitle.textContent = titulo;
     el.modalSubtitle.textContent = subtitulo;
     el.modalAcertos.textContent = acertos;
     el.modalFaltaram.textContent = faltaram;
     el.modalPrecisao.textContent = `${perc}%`;
 
-    el.modalTip.innerHTML = ehBandeiras
-      ? 'Todos os países das bandeiras não adivinhadas foram revelados em <strong>vermelho</strong>.'
-      : 'Todos os países não adivinhados foram revelados em <strong>vermelho</strong> no mapa e na lista.';
+    el.modalTip.innerHTML =
+      faltaram === 0
+        ? 'Você não deixou nenhum país para trás. Incrível!'
+        : ehBandeiras
+          ? 'As bandeiras que faltaram foram reveladas em <strong>vermelho</strong>, com o nome do país.'
+          : 'Os países que faltaram foram revelados em <strong>vermelho</strong> no mapa e na lista ao lado.';
 
     el.endgameModal.classList.remove('hidden');
   }
@@ -1484,7 +1597,7 @@
           <div class="continent-mini-fill" id="bar-${cont}"></div>
         </div>
       `;
-      row.addEventListener('click', () => enquadrarContinente(cont, true));
+      row.addEventListener('click', () => alternarFocoContinente(cont));
       el.continentsList.appendChild(row);
     }
   }
@@ -1494,8 +1607,10 @@
     const total = paisesEscopo.size;
     const perc = total > 0 ? Math.round((acertos / total) * 100) : 0;
 
-    el.lblPlacar.innerHTML = `${acertos} / ${total} <small>(${perc}%)</small>`;
+    el.lblPlacar.innerHTML = `${acertos}<small>/${total}</small>`;
     el.barraProgressoGeral.style.width = `${perc}%`;
+    el.scoreRing.style.setProperty('--p', perc);
+    el.scoreRingPct.textContent = `${perc}%`;
 
     for (const cont of CONTINENTES_ORDEM) {
       let totC = 0;
@@ -1510,12 +1625,15 @@
       const bar = document.getElementById(`bar-${cont}`);
       if (!lbl || !bar) continue;
 
+      const row = lbl.closest('.continent-row');
+      if (row) row.classList.toggle('is-empty', totC === 0);
+
       if (totC === 0) {
         lbl.textContent = '—';
         lbl.classList.remove('done');
         bar.style.width = '0%';
       } else {
-        lbl.textContent = acC === totC ? `✅ ${acC}/${totC}` : `${acC}/${totC}`;
+        lbl.textContent = acC === totC ? `✓ ${acC}/${totC}` : `${acC}/${totC}`;
         lbl.classList.toggle('done', acC === totC);
         bar.style.width = `${Math.round((acC / totC) * 100)}%`;
       }
@@ -1584,9 +1702,9 @@
     });
 
     if (jogoEncerrado) {
-      el.lblListaTitulo.textContent = `📋 RESULTADO (${paisesAcertados.size} ✅ | ${paisesPerdidos.size} ❌)`;
+      el.lblListaTitulo.innerHTML = `${icone('list')}Resultado · ${paisesAcertados.size} certos · ${paisesPerdidos.size} faltaram`;
     } else {
-      el.lblListaTitulo.textContent = `✅ ACERTADOS (${paisesAcertados.size})`;
+      el.lblListaTitulo.innerHTML = `${icone('check')}Acertados (${paisesAcertados.size})`;
     }
 
     if (!filtrados.length) {
@@ -1594,7 +1712,7 @@
       li.className = 'empty-list-msg';
       li.textContent = jogoEncerrado
         ? 'Nenhum país encontrado.'
-        : 'Os países acertados e os revelados ao fim do tempo aparecerão aqui.';
+        : 'Os países que você acertar aparecem aqui.';
       el.ulListaPaises.appendChild(li);
       return;
     }
@@ -1606,7 +1724,8 @@
       li.innerHTML = `
         <span class="country-li-left">
           <img class="country-li-flag" src="${obterUrlBandeira(codigo, false)}" alt="" loading="lazy" />
-          <span>${acertado ? '✅' : '❌'} ${d.nome}</span>
+          <i class="status-dot"></i>
+          <span>${d.nome}</span>
         </span>
         <small>${d.continente}</small>
       `;
@@ -1642,15 +1761,15 @@
     let html = '';
 
     if (neutralName) {
-      html = `🏳️ ${neutralName}`;
+      html = `<span class="muted">${neutralName}</span>`;
     } else if (!paisesEscopo.has(codigo)) {
-      html = `Fora da região (${PAISES[codigo].continente})`;
+      html = `<span class="muted">Fora da região · ${PAISES[codigo].continente}</span>`;
     } else if (paisesAcertados.has(codigo)) {
       const d = PAISES[codigo];
-      html = `✅ <strong>${d.nome}</strong>`;
+      html = `<i class="dot green"></i><strong>${d.nome}</strong>`;
     } else if (paisesPerdidos.has(codigo)) {
       const d = PAISES[codigo];
-      html = `❌ <strong>${d.nome}</strong>`;
+      html = `<i class="dot red"></i><strong>${d.nome}</strong>`;
     } else {
       el.mapTooltip.classList.add('hidden');
       return;
@@ -1690,10 +1809,15 @@
     el.btnEncerrar.addEventListener('click', () => {
       if (jogoEncerrado) return;
       const faltam = paisesEscopo.size - paisesAcertados.size;
-      const msg = `Ainda faltam ${faltam} países.\n\nDeseja encerrar agora e revelar os não adivinhados em vermelho?`;
-      if (faltam === 0 || window.confirm(msg)) {
+      if (faltam === 0) {
         finalizarPorTempoEsgotado(true);
+        return;
       }
+      el.confirmText.innerHTML = `Ainda ${faltam === 1 ? 'falta' : 'faltam'} <strong>${faltam}</strong> ${
+        faltam === 1 ? 'país' : 'países'
+      }. A partida será encerrada e os que faltaram aparecerão em vermelho.`;
+      abrirModal(el.confirmModal);
+      el.btnConfirmCancelar.focus();
     });
 
     el.inputPais.addEventListener('input', aoDigitarInput);
@@ -1728,9 +1852,12 @@
     });
 
     document.querySelectorAll('.flag-pill-btn').forEach((btn) => {
-      btn.addEventListener('click', () =>
-        definirFiltroContinenteBandeiras(btn.dataset.flagContinent)
-      );
+      btn.addEventListener('click', () => {
+        const cont = btn.dataset.flagContinent;
+        definirFiltroContinenteBandeiras(
+          cont !== 'Todos' && filtroContinenteBandeira === cont ? 'Todos' : cont
+        );
+      });
     });
 
     el.selectModoBandeira.addEventListener('change', () => {
@@ -1738,8 +1865,8 @@
       if (jogoAtivo && !jogoPausado) {
         el.inputPais.placeholder =
           modoRespostaBandeira === 'destaque'
-            ? 'Digite o país da bandeira selecionada (ou Tab para pular)...'
-            : 'Digite o nome de qualquer país...';
+            ? 'De qual país é esta bandeira? (Tab para pular)'
+            : 'Digite o nome de qualquer país…';
         el.inputPais.focus();
       }
     });
@@ -1755,10 +1882,10 @@
     // Controles de câmera do Mapa
     el.btnZoomIn.addEventListener('click', () => aplicarZoomCentro(1.35));
     el.btnZoomOut.addEventListener('click', () => aplicarZoomCentro(1 / 1.35));
-    el.btnZoomReset.addEventListener('click', () => enquadrarContinente(modoAtual, true));
+    el.btnZoomReset.addEventListener('click', () => enquadrarVisaoPadrao(true));
 
     document.querySelectorAll('.pill-btn').forEach((btn) => {
-      btn.addEventListener('click', () => enquadrarContinente(btn.dataset.continent, true));
+      btn.addEventListener('click', () => alternarFocoContinente(btn.dataset.continent));
     });
 
     el.chkIlhas.addEventListener('change', atualizarVisibilidadePinos);
@@ -1780,7 +1907,9 @@
     });
 
     // Interações de Pan, Zoom e Clique no Mapa SVG
-    el.mapViewport.addEventListener('mousedown', (e) => {
+    // Eventos de ponteiro: funcionam com mouse, toque e caneta
+    el.mapViewport.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('.zoom-controls, .start-hint, .panel-overlay')) return;
       if (e.button !== 0 && e.button !== 2) return;
       if (animacaoCameraId) {
         cancelAnimationFrame(animacaoCameraId);
@@ -1793,7 +1922,7 @@
       el.mapViewport.classList.add('dragging');
     });
 
-    window.addEventListener('mousemove', (e) => {
+    window.addEventListener('pointermove', (e) => {
       if (arrastandoMapa) {
         const dx = e.clientX - inicioArrastoX;
         const dy = e.clientY - inicioArrastoY;
@@ -1808,7 +1937,7 @@
       }
     });
 
-    window.addEventListener('mouseup', (e) => {
+    window.addEventListener('pointerup', (e) => {
       if (!arrastandoMapa) return;
       arrastandoMapa = false;
       el.mapViewport.classList.remove('dragging');
@@ -1816,7 +1945,11 @@
       if (!moveuDuranteClique) {
         const cod = e.target && e.target.dataset ? e.target.dataset.code : null;
         if (cod && paisesEscopo.has(cod)) {
-          selecionarPais(cod, false);
+          // Clicar de novo no país selecionado tira a seleção
+          selecionarPais(cod === paisSelecionado ? null : cod, false);
+        } else if (!cod && paisSelecionado && el.worldSvg.contains(e.target)) {
+          // Clicar no oceano também tira a seleção
+          selecionarPais(null, false);
         }
       }
     });
@@ -1845,7 +1978,120 @@
 
     window.addEventListener('resize', () => {
       if (abaJogoAtual === 'mapa') {
-        enquadrarContinente(modoAtual, false);
+        enquadrarContinente(continenteFocado || modoAtual, false);
+      }
+    });
+  }
+
+  // =========================================================================
+  // INTERFACE: MODAIS, AJUDA, TEMA E ATALHOS GLOBAIS
+  // =========================================================================
+  function abrirModal(modal) {
+    modal.classList.remove('hidden');
+  }
+
+  function fecharModal(modal) {
+    modal.classList.add('hidden');
+    if (!el.inputPais.disabled) el.inputPais.focus();
+  }
+
+  function modalAberto() {
+    return [el.helpModal, el.confirmModal, el.endgameModal].find(
+      (m) => !m.classList.contains('hidden')
+    );
+  }
+
+  function abrirAjuda() {
+    abrirModal(el.helpModal);
+    el.btnComecarAjuda.focus();
+  }
+
+  function abrirAjudaNaPrimeiraVisita() {
+    let jaViu = false;
+    try {
+      jaViu = localStorage.getItem('atlas-ajuda-vista') === '1';
+    } catch (e) {
+      jaViu = false;
+    }
+    if (jaViu) return;
+    abrirAjuda();
+    try {
+      localStorage.setItem('atlas-ajuda-vista', '1');
+    } catch (e) {
+      /* armazenamento indisponível: ignora */
+    }
+  }
+
+  // Recuo do valor nas caixas de seleção compactas = largura do rótulo
+  function ajustarCamposSelecao() {
+    document.querySelectorAll('.select-field.select-sm').forEach((campo) => {
+      const rotulo = campo.querySelector('.select-label');
+      const largura = rotulo ? rotulo.getBoundingClientRect().width : 0;
+      if (largura > 0) campo.style.setProperty('--label-w', `${Math.ceil(largura)}px`);
+    });
+  }
+
+  function alternarTema() {
+    const atual = document.documentElement.getAttribute('data-theme');
+    const novo = atual === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', novo);
+    try {
+      localStorage.setItem('atlas-tema', novo);
+    } catch (e) {
+      /* armazenamento indisponível: ignora */
+    }
+  }
+
+  function vincularEventosInterface() {
+    el.btnAjuda.addEventListener('click', abrirAjuda);
+    el.btnFecharAjuda.addEventListener('click', () => fecharModal(el.helpModal));
+    el.btnComecarAjuda.addEventListener('click', () => fecharModal(el.helpModal));
+    el.btnTema.addEventListener('click', alternarTema);
+
+    el.btnConfirmCancelar.addEventListener('click', () => fecharModal(el.confirmModal));
+    el.btnConfirmOk.addEventListener('click', () => {
+      el.confirmModal.classList.add('hidden');
+      if (!jogoEncerrado) finalizarPorTempoEsgotado(true);
+    });
+
+    // Clicar fora do cartão fecha a ajuda e a confirmação
+    [el.helpModal, el.confirmModal].forEach((modal) => {
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) fecharModal(modal);
+      });
+    });
+
+    el.mapStartHint.addEventListener('click', () => el.inputPais.focus());
+
+    ajustarCamposSelecao();
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(ajustarCamposSelecao);
+    }
+
+    document.addEventListener('keydown', (e) => {
+      const aberto = modalAberto();
+      if (aberto) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          fecharModal(aberto);
+        }
+        return;
+      }
+
+      // Começar a digitar em qualquer lugar da página leva ao campo de resposta
+      const alvo = document.activeElement;
+      const emCampo =
+        alvo && (alvo.tagName === 'INPUT' || alvo.tagName === 'SELECT' || alvo.tagName === 'TEXTAREA');
+      if (
+        !emCampo &&
+        !el.inputPais.disabled &&
+        e.key.length === 1 &&
+        e.key !== ' ' &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey
+      ) {
+        el.inputPais.focus();
       }
     });
   }

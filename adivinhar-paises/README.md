@@ -22,6 +22,14 @@ Jogo web interativo com duas abas de desafio (**🗺️ Adivinhar Países no Map
   - **Atalhos de Continentes**: Botões rápidos na barra superior e no painel de progresso por continente.
   - **Exploração Pós-Jogo**: Ao acabar o tempo, feche o modal de resumo para explorar livremente os países e bandeiras verdes e vermelhos ou filtre pela lista lateral (**✅ Acertados** / **❌ Faltaram**).
 
+- **Interface Moderna e Intuitiva**:
+  - Campo de resposta em destaque no topo, com feedback logo abaixo, anel de progresso dos acertos e barra de tempo restante.
+  - Tela **Como jogar** exibida na primeira visita (e sempre disponível no botão `?`), além de uma dica flutuante no mapa antes de começar.
+  - Comece a digitar em qualquer lugar da página: o foco vai direto para o campo de resposta.
+  - **Tema claro e escuro** (segue o sistema por padrão; alternável no botão de sol/lua e lembrado entre visitas).
+  - Confirmação própria ao **Revelar** a partida, resumo final com aproveitamento em anel e botão **Reiniciar** destacado ao fim do jogo.
+  - Layout responsivo para tablets e celulares, com arraste do mapa por toque.
+
 ## ▶️ Como Executar
 
 Basta abrir o arquivo [`index.html`](./index.html) diretamente em qualquer navegador moderno (Chrome, Edge, Firefox, Safari) ou servir a pasta com um servidor local (ex.: *Live Server* do VS Code).
@@ -29,6 +37,6 @@ Basta abrir o arquivo [`index.html`](./index.html) diretamente em qualquer naveg
 ## 📁 Estrutura de Arquivos
 
 - `index.html`: Estrutura principal da interface, cabeçalho de controle, viewport do mapa SVG, painel lateral e modal de resultado.
-- `css/styles.css`: Estilização moderna em modo escuro, animações e estados visuais do mapa.
+- `css/styles.css`: Estilização moderna com tokens de tema (claro/escuro), animações, layout responsivo e estados visuais do mapa.
 - `js/app.js`: Motor do jogo, renderizador SVG vetorial, câmera interativa (zoom/pan animado), cronômetro e lógica de validação.
 - `data/paises.json` e `js/dados-paises.js`: Dados geográficos (polígonos, capitais, continentes e sinônimos) dos 197 países soberanos.
