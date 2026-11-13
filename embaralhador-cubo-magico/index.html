@@ -6,7 +6,7 @@
   <title>CubeScramble 3D — Simulador de Embaralhamento</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/styles.css" />
 
   <!-- Three.js + TrackballControls via ES Module Import Map -->
@@ -28,109 +28,144 @@
   <script defer src="js/app.js"></script>
 </head>
 <body>
-  <!-- Header -->
+  <!-- Ícone reutilizável: cubo na orientação de referência (amarelo em cima, azul de frente, vermelho à direita) -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="cube-orientation" viewBox="0 0 40 40">
+      <g stroke="#16181c" stroke-width="1.6" stroke-linejoin="round">
+        <path d="M20 4 34 12 20 20 6 12Z" fill="#ffd500" />
+        <path d="M6 12 20 20 20 36 6 28Z" fill="#0046ad" />
+        <path d="M20 20 34 12 34 28 20 36Z" fill="#b71234" />
+      </g>
+      <path stroke="#16181c" stroke-width="1" fill="none"
+        d="M10.67 9.33 24.67 17.33M15.33 6.67 29.33 14.67M24.67 6.67 10.67 14.67M29.33 9.33 15.33 17.33
+           M10.67 14.67V30.67M15.33 17.33V33.33M6 17.33 20 25.33M6 22.67 20 30.67
+           M24.67 17.33V33.33M29.33 14.67V30.67M20 25.33 34 17.33M20 30.67 34 22.67" />
+    </symbol>
+  </svg>
+
   <header class="app-header">
     <div class="brand">
-      <div class="brand-icon" aria-hidden="true">
-        <span></span><span></span><span></span><span></span>
-      </div>
+      <svg class="brand-icon" aria-hidden="true"><use href="#cube-orientation" /></svg>
       <h1>CubeScramble 3D</h1>
     </div>
 
     <div class="header-controls">
-      <div class="cube-selector" role="group" aria-label="Escolher tipo de cubo">
-        <button type="button" class="cube-type-btn active" data-size="3">3x3x3</button>
-        <button type="button" class="cube-type-btn" data-size="2">2x2x2</button>
+      <div class="segmented" role="group" aria-label="Tipo de cubo">
+        <button type="button" class="segmented-btn" data-size="3" aria-pressed="true">3×3</button>
+        <button type="button" class="segmented-btn" data-size="2" aria-pressed="false">2×2</button>
       </div>
 
-      <button type="button" id="btn-new-scramble" class="btn btn-primary">
-        Novo Embaralhamento
+      <button type="button" id="btn-new-scramble" class="btn btn-ink">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.34 5.66M20 4v7h-7" /></svg>
+        <span>Novo embaralhamento</span>
       </button>
     </div>
   </header>
 
-  <!-- Main Split Layout -->
   <main class="app-main">
-    <!-- Left: Clean 3D Cube Stage -->
-    <section class="viewport-panel" aria-label="Visualização 3D do Cubo Mágico">
-      <div class="viewport-toolbar">
-        <span class="viewport-hint">Arraste para girar 360° • Scroll para zoom</span>
+    <!-- Cubo 3D -->
+    <section class="viewport-panel" aria-label="Visualização 3D do cubo">
+      <div id="canvas-container"></div>
+
+      <p id="view-status" class="view-status" role="status" hidden>
+        Você girou a vista. As letras continuam valendo para a posição de referência.
+      </p>
+
+      <div class="viewport-bar">
+        <p id="viewport-hint" class="viewport-hint">Arraste para girar o cubo. Role para aproximar.</p>
         <div class="viewport-actions">
-          <button type="button" id="btn-toggle-labels" class="btn btn-ghost">
-            Rótulos: ON
+          <button type="button" id="btn-toggle-labels" class="chip-btn" aria-pressed="true">
+            <span class="switch" aria-hidden="true"></span>
+            Letras das faces
           </button>
-          <button type="button" id="btn-reset-camera" class="btn btn-ghost">
-            Resetar Câmera
+          <button type="button" id="btn-reset-camera" class="chip-btn">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5" /></svg>
+            Voltar à referência
           </button>
         </div>
       </div>
-
-      <div id="canvas-container"></div>
     </section>
 
-    <!-- Right: Focused Step-by-Step Guide -->
-    <aside class="scramble-panel" aria-label="Guia Passo a Passo">
-      <!-- 1. Spotlight Card: Current Move & Playback -->
-      <div class="panel-card spotlight-card">
-        <div class="spotlight-top">
-          <div id="active-move-symbol" class="spotlight-badge">R</div>
-          <div class="spotlight-info">
-            <span id="active-move-step-label" class="spotlight-step">PASSO 1 DE 20</span>
-            <h2 id="active-move-title" class="spotlight-title">Face Direita (Vermelha)</h2>
-            <p id="active-move-desc" class="spotlight-desc">Giro de 90° no sentido horário</p>
-          </div>
+    <!-- Guia passo a passo -->
+    <aside class="guide-panel" aria-label="Guia passo a passo">
+      <div class="hold-guide">
+        <svg class="hold-cube" aria-hidden="true"><use href="#cube-orientation" /></svg>
+        <p>Comece com o <strong>amarelo em cima</strong> e o <strong>azul de frente</strong> e não vire o cubo inteiro até o fim. Os movimentos indicam posições (cima, frente, direita), não cores.</p>
+      </div>
+
+      <section class="move-hero" aria-live="polite" aria-atomic="true">
+        <div id="move-diagram" class="move-diagram" aria-hidden="true"></div>
+        <div class="move-text">
+          <p id="move-step" class="move-step">Passo 1 de 20</p>
+          <p id="move-notation" class="move-notation">R</p>
+          <h2 id="move-title" class="move-title">Camada da direita para cima</h2>
+          <p id="move-desc" class="move-desc">Um quarto de volta (90°).</p>
+        </div>
+      </section>
+
+      <div class="move-controls">
+        <div class="transport">
+          <button type="button" id="btn-step-start" class="btn btn-icon" aria-label="Voltar ao início" title="Voltar ao início">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v14M18 6l-8 6 8 6Z" /></svg>
+          </button>
+          <button type="button" id="btn-step-prev" class="btn">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
+            <span>Anterior</span>
+            <kbd>←</kbd>
+          </button>
+          <button type="button" id="btn-step-next" class="btn btn-ink btn-next">
+            <span id="btn-step-next-label">Próximo</span>
+            <kbd>→</kbd>
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+          </button>
+          <button type="button" id="btn-step-end" class="btn btn-icon" aria-label="Pular para o fim" title="Pular para o fim">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 5v14M6 6l8 6-8 6Z" /></svg>
+          </button>
         </div>
 
-        <div class="progress-bar-track">
-          <div id="progress-fill" class="progress-bar-fill"></div>
-        </div>
-
-        <div class="playback-buttons">
-          <button type="button" id="btn-step-start" class="btn playback-btn" title="Voltar ao início">
-            ⏮
+        <div class="autoplay">
+          <button type="button" id="btn-play-pause" class="btn btn-quiet">
+            <svg id="icon-play" class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5l12 7-12 7Z" /></svg>
+            <svg id="icon-pause" class="icon" viewBox="0 0 24 24" aria-hidden="true" hidden><path d="M8 5v14M16 5v14" /></svg>
+            <span id="btn-play-label">Reproduzir tudo</span>
+            <kbd>Espaço</kbd>
           </button>
-          <button type="button" id="btn-step-prev" class="btn playback-btn" title="Passo anterior (Seta Esquerda)">
-            ◀ Anterior
-          </button>
-          <button type="button" id="btn-play-pause" class="btn playback-btn play-main" title="Reproduzir ou pausar (Espaço)">
-            ▶ Reproduzir
-          </button>
-          <button type="button" id="btn-step-next" class="btn playback-btn" title="Próximo passo (Seta Direita)">
-            Próximo ▶
-          </button>
-          <button type="button" id="btn-step-end" class="btn playback-btn" title="Ir para o final">
-            ⏭
-          </button>
-        </div>
-
-        <div class="speed-row">
-          <span>Velocidade</span>
-          <input type="range" id="speed-slider" min="0.5" max="3.0" step="0.1" value="1.0" />
-          <strong id="speed-value">1.0x</strong>
+          <label class="speed">
+            <span>Velocidade</span>
+            <input type="range" id="speed-slider" min="0.5" max="3.0" step="0.1" value="1.0" />
+            <output id="speed-value" for="speed-slider">1,0×</output>
+          </label>
         </div>
       </div>
 
-      <!-- 2. Unified Sequence Grid -->
-      <div class="panel-card sequence-card">
-        <div class="card-header">
-          <span class="card-title">Sequência de Movimentos</span>
-          <button type="button" id="btn-copy-scramble" class="btn btn-ghost btn-xs">
-            Copiar Notação
+      <section class="sequence" aria-labelledby="sequence-title">
+        <div class="sequence-head">
+          <h3 id="sequence-title">Sequência</h3>
+          <button type="button" id="btn-copy-scramble" class="chip-btn">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 9h10v10H9zM5 15V5h10" /></svg>
+            <span>Copiar notação</span>
           </button>
         </div>
+        <p class="sequence-tip">Toque em um movimento para ir direto até ele.</p>
+        <ol id="steps-grid" class="steps-grid"></ol>
+      </section>
 
-        <div id="steps-grid" class="steps-grid"></div>
-      </div>
-
-      <!-- 3. Collapsible Notation Reference -->
-      <details class="notation-details">
-        <summary>Como ler a notação da comunidade (WCA)?</summary>
-        <div class="notation-help-content">
-          <p>Segure o cubo com o centro <strong>Verde na Frente (F)</strong> e o <strong>Branco no Topo (U)</strong>:</p>
+      <details class="notation">
+        <summary>O que significam as letras?</summary>
+        <div class="notation-body">
+          <p>Cada letra é uma posição em relação a você, com o cubo na posição de referência. Se você virar o cubo inteiro, a camada "de cima" passa a ser outra, por isso não vire o cubo durante o embaralhamento.</p>
+          <dl class="notation-faces">
+            <div><dt>U</dt><dd>cima</dd></div>
+            <div><dt>D</dt><dd>baixo</dd></div>
+            <div><dt>F</dt><dd>frente</dd></div>
+            <div><dt>B</dt><dd>trás</dd></div>
+            <div><dt>R</dt><dd>direita</dd></div>
+            <div><dt>L</dt><dd>esquerda</dd></div>
+          </dl>
           <ul>
-            <li><code>R, L, U, D, F, B</code> — Giro de <strong>90° no sentido horário</strong> olhando para a face.</li>
-            <li><code>'</code> (ex: <code>U'</code>, <code>R'</code>) — Giro de <strong>90° no sentido anti-horário</strong>.</li>
-            <li><code>2</code> (ex: <code>F2</code>, <code>R2</code>) — Giro duplo de <strong>180°</strong>.</li>
+            <li><b>Letra sozinha</b> (R): um quarto de volta no sentido horário, como se você olhasse de frente para aquela face.</li>
+            <li><b>Com apóstrofo</b> (R'): um quarto de volta no sentido anti-horário.</li>
+            <li><b>Com 2</b> (R2): meia volta, para qualquer lado.</li>
           </ul>
         </div>
       </details>

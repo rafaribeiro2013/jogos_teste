@@ -5,59 +5,66 @@ function initApp() {
   const THREE = window.THREE;
   const TrackballControls = window.TrackballControls;
 
+  // Os movimentos são sempre descritos pela POSIÇÃO em relação a quem segura o
+  // cubo (cima, frente, direita…), nunca pela cor: a cor de uma face muda quando
+  // as peças se movem (no 2×2 nem existe centro fixo). `hex` serve só para pintar
+  // o cubo resolvido no início.
+  // `clockwise` / `counter` traduzem o giro para linguagem simples, olhando o
+  // cubo de frente na posição de referência (ex.: R = camada da direita para cima).
   const FACES = {
     U: {
       axis: 'y',
       sign: 1,
-      name: 'Topo',
-      colorName: 'Branca',
-      hex: '#ffffff',
-      badgeText: '#090d16',
+      layer: 'de cima',
+      hex: '#ffd500',
+      clockwise: 'para a esquerda',
+      counter: 'para a direita',
       normal: new THREE.Vector3(0, 1, 0)
     },
     D: {
       axis: 'y',
       sign: -1,
-      name: 'Base',
-      colorName: 'Amarela',
-      hex: '#ffd500',
-      badgeText: '#090d16',
+      layer: 'de baixo',
+      hex: '#ffffff',
+      clockwise: 'para a direita',
+      counter: 'para a esquerda',
       normal: new THREE.Vector3(0, -1, 0)
     },
     F: {
       axis: 'z',
       sign: 1,
-      name: 'Frente',
-      colorName: 'Verde',
-      hex: '#009b48',
-      badgeText: '#ffffff',
+      layer: 'da frente',
+      hex: '#0046ad',
+      clockwise: 'no sentido horário',
+      counter: 'no sentido anti-horário',
       normal: new THREE.Vector3(0, 0, 1)
     },
     B: {
       axis: 'z',
       sign: -1,
-      name: 'Trás',
-      colorName: 'Azul',
-      hex: '#0046ad',
-      badgeText: '#ffffff',
+      layer: 'de trás',
+      hex: '#009b48',
+      clockwise: 'no sentido anti-horário',
+      counter: 'no sentido horário',
+      viewNote: ', olhando o cubo de frente',
       normal: new THREE.Vector3(0, 0, -1)
     },
     R: {
       axis: 'x',
       sign: 1,
-      name: 'Direita',
-      colorName: 'Vermelha',
+      layer: 'da direita',
       hex: '#b71234',
-      badgeText: '#ffffff',
+      clockwise: 'para cima',
+      counter: 'para baixo',
       normal: new THREE.Vector3(1, 0, 0)
     },
     L: {
       axis: 'x',
       sign: -1,
-      name: 'Esquerda',
-      colorName: 'Laranja',
+      layer: 'da esquerda',
       hex: '#ff5800',
-      badgeText: '#ffffff',
+      clockwise: 'para baixo',
+      counter: 'para cima',
       normal: new THREE.Vector3(-1, 0, 0)
     }
   };
@@ -72,14 +79,16 @@ function initApp() {
     if (!face || !['', "'", '2'].includes(modifier)) return null;
 
     let turns = 1;
-    let directionDesc = 'Giro de 90° no sentido horário';
+    let title = `Camada ${face.layer} ${face.clockwise}`;
+    let description = `Um quarto de volta (90°)${face.viewNote || ''}.`;
 
     if (modifier === "'") {
       turns = -1;
-      directionDesc = 'Giro de 90° no sentido anti-horário';
+      title = `Camada ${face.layer} ${face.counter}`;
     } else if (modifier === '2') {
       turns = 2;
-      directionDesc = 'Giro duplo de 180°';
+      title = `Camada ${face.layer}, meia volta`;
+      description = 'Meia volta (180°), para qualquer lado.';
     }
 
     const angleRad = -face.sign * turns * (Math.PI / 2);
@@ -91,9 +100,101 @@ function initApp() {
       face,
       turns,
       angleRad,
-      title: `Face ${face.name} (${face.colorName})`,
-      description: directionDesc
+      title,
+      description
     };
+  }
+
+  // Posição de referência: a vista em que as letras correspondem a quem segura o
+  // cubo (cima = U, frente = F, direita = R). A vista 3D pode ser girada à vontade,
+  // mas as letras nunca mudam; o botão "Voltar à referência" restaura esta vista.
+  const REFERENCE_DIR = new THREE.Vector3(4.8, 3.9, 5.6).normalize();
+  const REFERENCE_DISTANCE = Math.hypot(4.8, 3.9, 5.6);
+  const WORLD_UP = new THREE.Vector3(0, 1, 0);
+
+  // Faces que ficam escondidas na posição de referência: a seta delas é tracejada.
+  const HIDDEN_FACES = ['L', 'D', 'B'];
+
+  // Pontos do arco da seta de um movimento, usados pela seta 3D e pelo diagrama.
+  // O arco é centrado no lado da camada voltado para a vista de referência, para
+  // a seta aparecer de lado (legível) em vez de apontar para longe de quem olha.
+  function arrowArcPoints(parsed, radius, dist, segments) {
+    const { face, angleRad, turns } = parsed;
+    const axisVec = new THREE.Vector3(
+      face.axis === 'x' ? 1 : 0,
+      face.axis === 'y' ? 1 : 0,
+      face.axis === 'z' ? 1 : 0
+    );
+    const perp = REFERENCE_DIR.clone().projectOnPlane(axisVec).normalize().multiplyScalar(radius);
+    const sweep = Math.abs(turns) === 2 ? angleRad * 0.85 : angleRad * 1.15;
+    const points = [];
+    for (let i = 0; i <= segments; i++) {
+      const t = i / segments - 0.5;
+      points.push(
+        perp.clone().applyAxisAngle(axisVec, sweep * t).addScaledVector(face.normal, dist)
+      );
+    }
+    return points;
+  }
+
+  // Desenho isométrico do cubo sempre na posição de referência (cima, frente e
+  // direita visíveis), com a camada que gira destacada e a seta da direção.
+  // Não usa as cores dos adesivos de propósito: só a posição importa.
+  function buildMoveDiagram(parsed, n) {
+    // Projeção isométrica de coordenadas normalizadas (-1..1) para o viewBox 40×40
+    const P = (x, y, z) => [20 + 7 * (x - z), 20 + 4 * (x + z) - 8 * y];
+    const fmt = ([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`;
+    const poly = (pts) => pts.map((p) => fmt(P(...p))).join(' ');
+
+    const cell = 2 / n;
+    const gap = cell * 0.09;
+    const inLayer = (c) => !!parsed && c[parsed.face.axis] * parsed.face.sign > 1 - cell;
+    const sticker = (pts, center) =>
+      `<polygon class="sticker${inLayer(center) ? ' on' : ''}" points="${poly(pts)}"/>`;
+
+    let svg = '';
+    svg += `<polygon class="body" points="${poly([[-1, 1, -1], [1, 1, -1], [1, 1, 1], [-1, 1, 1]])}"/>`;
+    svg += `<polygon class="body" points="${poly([[-1, 1, 1], [1, 1, 1], [1, -1, 1], [-1, -1, 1]])}"/>`;
+    svg += `<polygon class="body" points="${poly([[1, 1, 1], [1, 1, -1], [1, -1, -1], [1, -1, 1]])}"/>`;
+
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        const a0 = -1 + i * cell + gap;
+        const a1 = -1 + (i + 1) * cell - gap;
+        const b0 = -1 + j * cell + gap;
+        const b1 = -1 + (j + 1) * cell - gap;
+        const am = (a0 + a1) / 2;
+        const bm = (b0 + b1) / 2;
+        // cima (y = 1)
+        svg += sticker([[a0, 1, b0], [a1, 1, b0], [a1, 1, b1], [a0, 1, b1]], { x: am, y: 1, z: bm });
+        // frente (z = 1)
+        svg += sticker([[a0, b0, 1], [a1, b0, 1], [a1, b1, 1], [a0, b1, 1]], { x: am, y: bm, z: 1 });
+        // direita (x = 1)
+        svg += sticker([[1, b0, a0], [1, b0, a1], [1, b1, a1], [1, b1, a0]], { x: 1, y: bm, z: am });
+      }
+    }
+
+    if (parsed) {
+      // Mesmo arco da seta 3D, projetado no desenho
+      const pts = arrowArcPoints(parsed, 0.78, 1.22, 24).map((v) => P(v.x, v.y, v.z));
+
+      const d = pts.map((p, idx) => `${idx ? 'L' : 'M'}${fmt(p)}`).join(' ');
+      const end = pts[pts.length - 1];
+      const prev = pts[pts.length - 3];
+      const len = Math.hypot(end[0] - prev[0], end[1] - prev[1]) || 1;
+      const ux = (end[0] - prev[0]) / len;
+      const uy = (end[1] - prev[1]) / len;
+      const tip = [end[0] + ux * 3.2, end[1] + uy * 3.2];
+      const left = [end[0] - ux * 0.8 - uy * 2.7, end[1] - uy * 0.8 + ux * 2.7];
+      const right = [end[0] - ux * 0.8 + uy * 2.7, end[1] - uy * 0.8 - ux * 2.7];
+      const hidden = HIDDEN_FACES.includes(parsed.faceKey) ? ' hidden-side' : '';
+
+      svg += `<path class="arrow-halo" d="${d}"/>`;
+      svg += `<path class="arrow${hidden}" d="${d}"/>`;
+      svg += `<polygon class="arrow-head" points="${[tip, left, right].map(fmt).join(' ')}"/>`;
+    }
+
+    return `<svg viewBox="1 1 38 38" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`;
   }
 
   function invertMoveNotation(moveStr) {
@@ -226,57 +327,46 @@ function initApp() {
       const parsed = parseMove(this.scrambleMoves[this.currentStepIndex]);
       if (!parsed) return;
 
-      const { face, angleRad, turns } = parsed;
-      const axisVec = new THREE.Vector3(
-        face.axis === 'x' ? 1 : 0,
-        face.axis === 'y' ? 1 : 0,
-        face.axis === 'z' ? 1 : 0
-      );
-
-      const radius = 1.05;
-      const perpVec =
-        face.axis === 'y'
-          ? new THREE.Vector3(0, 0, radius)
-          : new THREE.Vector3(0, radius, 0);
-
-      const faceDist = 1.72;
-      const totalSweep = Math.abs(turns) === 2 ? angleRad * 0.85 : angleRad * 1.15;
-      const segments = 32;
-      const curvePoints = [];
-
-      for (let i = 0; i <= segments; i++) {
-        const t = i / segments - 0.5;
-        const p = perpVec
-          .clone()
-          .applyAxisAngle(axisVec, totalSweep * t)
-          .addScaledVector(face.normal, faceDist);
-        curvePoints.push(p);
-      }
+      const curvePoints = arrowArcPoints(parsed, 1.05, 1.72, 32);
 
       const curve = new THREE.CatmullRomCurve3(curvePoints);
       const tubeGeo = new THREE.TubeGeometry(curve, 32, 0.06, 12, false);
-      const arrowColor = Math.abs(turns) === 2 ? 0xf59e0b : 0x38bdf8;
+      // Magenta: não existe em nenhum adesivo, então a seta nunca se confunde com uma face
+      const arrowColor = 0xe0187a;
+      // A seta é desenhada por cima do cubo para continuar visível quando a
+      // camada está do lado escondido (L, B, D na vista inicial).
       const tubeMat = new THREE.MeshBasicMaterial({
         color: arrowColor,
         transparent: true,
-        opacity: 0.9
+        opacity: 0.9,
+        depthTest: false
       });
-      this.arrowGroup.add(new THREE.Mesh(tubeGeo, tubeMat));
+      const tubeMesh = new THREE.Mesh(tubeGeo, tubeMat);
+      tubeMesh.renderOrder = 10;
+      this.arrowGroup.add(tubeMesh);
 
       const endPoint = curvePoints[curvePoints.length - 1];
       const prevPoint = curvePoints[curvePoints.length - 3];
       const tangent = new THREE.Vector3().subVectors(endPoint, prevPoint).normalize();
 
-      const coneGeo = new THREE.ConeGeometry(0.16, 0.34, 16);
-      const coneMat = new THREE.MeshBasicMaterial({
+      // Ponta plana, deitada no plano da camada: continua legível mesmo quando a
+      // camada é vista em ângulo baixo (um cone viraria um círculo).
+      const planeCenter = parsed.face.normal.clone().multiplyScalar(1.72);
+      const radial = new THREE.Vector3().subVectors(endPoint, planeCenter).normalize();
+      const tip = endPoint.clone().addScaledVector(tangent, 0.42);
+      const baseA = endPoint.clone().addScaledVector(tangent, -0.04).addScaledVector(radial, 0.26);
+      const baseB = endPoint.clone().addScaledVector(tangent, -0.04).addScaledVector(radial, -0.26);
+      const headGeo = new THREE.BufferGeometry().setFromPoints([tip, baseA, baseB]);
+      const headMat = new THREE.MeshBasicMaterial({
         color: arrowColor,
         transparent: true,
-        opacity: 0.95
+        opacity: 0.95,
+        depthTest: false,
+        side: THREE.DoubleSide
       });
-      const coneMesh = new THREE.Mesh(coneGeo, coneMat);
-      coneMesh.position.copy(endPoint).addScaledVector(tangent, 0.1);
-      coneMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), tangent);
-      this.arrowGroup.add(coneMesh);
+      const headMesh = new THREE.Mesh(headGeo, headMat);
+      headMesh.renderOrder = 10;
+      this.arrowGroup.add(headMesh);
     }
 
     initFaceLabels() {
@@ -294,7 +384,7 @@ function initApp() {
       labelSpecs.forEach((spec) => {
         const el = document.createElement('div');
         el.className = 'face-3d-label';
-        el.innerHTML = `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${FACES[spec.key].hex};margin-right:5px;vertical-align:middle;"></span>${spec.key}`;
+        el.textContent = spec.key;
         this.container.appendChild(el);
         this.labelElements[spec.key] = { el, worldPos: spec.pos };
       });
@@ -326,8 +416,10 @@ function initApp() {
     }
 
     resetCameraPosition(smooth = true) {
-      const targetPos = new THREE.Vector3(4.8, 3.9, 5.6);
-      const targetUp = new THREE.Vector3(0, 1, 0);
+      // Em telas estreitas (celular em pé) a câmera se afasta para o cubo caber inteiro
+      const fit = Math.max(1, 1.2 / (this.camera.aspect || 1));
+      const targetPos = REFERENCE_DIR.clone().multiplyScalar(REFERENCE_DISTANCE * fit);
+      const targetUp = WORLD_UP.clone();
       if (!smooth) {
         this.camera.position.copy(targetPos);
         this.camera.up.copy(targetUp);
@@ -359,7 +451,7 @@ function initApp() {
       const bodySize = spacing * 0.96;
       const bodyGeo = new THREE.BoxGeometry(bodySize, bodySize, bodySize);
       const bodyMat = new THREE.MeshStandardMaterial({
-        color: 0x0f172a,
+        color: 0x16181c,
         roughness: 0.32,
         metalness: 0.15
       });
@@ -413,7 +505,9 @@ function initApp() {
 
     buildCube(size) {
       this.cubeSize = size;
-      this.cubies.forEach((c) => this.cubeGroup.remove(c));
+      // Remove as peças de onde estiverem (inclusive do pivô, se uma animação foi interrompida)
+      this.cubies.forEach((c) => c.parent && c.parent.remove(c));
+      this.pivotGroup.rotation.set(0, 0, 0);
       this.cubies = [];
 
       this.spacing = size === 3 ? 1.02 : 1.42;
@@ -434,6 +528,7 @@ function initApp() {
     resetCubeToSolved() {
       this.animationQueue = [];
       this.isAnimating = false;
+      this.animToken = (this.animToken || 0) + 1; // cancela animações em andamento
       this.buildCube(this.cubeSize);
     }
 
@@ -496,8 +591,10 @@ function initApp() {
       activeCubies.forEach((c) => this.pivotGroup.attach(c));
 
       const startTime = performance.now();
+      const token = this.animToken;
 
       const stepAnim = (now) => {
+        if (token !== this.animToken) return;
         const t = Math.min(1, (now - startTime) / duration);
         const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 
@@ -547,6 +644,7 @@ function initApp() {
       this.resetCubeToSolved();
       this.scrambleMoves = customMoves || generateScramble(this.cubeSize);
       this.currentStepIndex = 0;
+      this.buildSequenceUI();
       this.renderScrambleUI();
     }
 
@@ -619,83 +717,98 @@ function initApp() {
     }
 
     updatePlayButtonUI() {
-      const playBtn = document.getElementById('btn-play-pause');
-      if (!playBtn) return;
-      playBtn.innerHTML = this.isPlaying ? '⏸ Pausar' : '▶ Reproduzir';
+      const label = document.getElementById('btn-play-label');
+      if (!label) return;
+      label.textContent = this.isPlaying ? 'Pausar' : 'Reproduzir tudo';
+      document.getElementById('icon-play').hidden = this.isPlaying;
+      document.getElementById('icon-pause').hidden = !this.isPlaying;
+    }
+
+    // Cria os botões da sequência uma vez por embaralhamento; depois só os estados mudam.
+    buildSequenceUI() {
+      const stepsGrid = document.getElementById('steps-grid');
+      stepsGrid.innerHTML = '';
+      this.stepChips = this.scrambleMoves.map((mv, idx) => {
+        const parsed = parseMove(mv);
+        const li = document.createElement('li');
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'step-chip';
+        chip.setAttribute('aria-label', `Movimento ${idx + 1}: ${mv}, ${parsed.title.toLowerCase()}`);
+        chip.innerHTML = `
+          <span class="step-chip-meta" aria-hidden="true">${idx + 1}</span>
+          <span class="step-chip-move" aria-hidden="true">${mv}</span>
+        `;
+        chip.addEventListener('click', () => this.jumpToStep(idx));
+        li.appendChild(chip);
+        stepsGrid.appendChild(li);
+        return chip;
+      });
     }
 
     renderScrambleUI() {
       const total = this.scrambleMoves.length;
       const current = this.currentStepIndex;
+      const finished = current >= total;
 
       this.update3DMoveIndicator();
 
-      // 1. Spotlight Card
-      const symbolEl = document.getElementById('active-move-symbol');
-      const stepLabelEl = document.getElementById('active-move-step-label');
-      const titleEl = document.getElementById('active-move-title');
-      const descEl = document.getElementById('active-move-desc');
+      // 1. Movimento atual
+      const heroEl = document.querySelector('.move-hero');
+      const diagramEl = document.getElementById('move-diagram');
+      const notationEl = document.getElementById('move-notation');
+      const stepEl = document.getElementById('move-step');
+      const titleEl = document.getElementById('move-title');
+      const descEl = document.getElementById('move-desc');
 
-      if (current < total) {
+      if (!finished) {
         const nextMove = parseMove(this.scrambleMoves[current]);
-        symbolEl.textContent = nextMove.notation;
-        symbolEl.style.background = nextMove.face.hex;
-        symbolEl.style.color = nextMove.face.badgeText;
-        stepLabelEl.textContent = `PASSO ${current + 1} DE ${total}`;
+        diagramEl.innerHTML = buildMoveDiagram(nextMove, this.cubeSize);
+        notationEl.textContent = nextMove.notation;
+        stepEl.textContent = `Passo ${current + 1} de ${total}`;
         titleEl.textContent = nextMove.title;
         descEl.textContent = nextMove.description;
       } else {
-        symbolEl.textContent = '✓';
-        symbolEl.style.background = '#22c55e';
-        symbolEl.style.color = '#052e16';
-        stepLabelEl.textContent = `CONCLUÍDO (${total}/${total})`;
-        titleEl.textContent = 'Cubo Embaralhado!';
-        descEl.textContent = 'Todos os movimentos foram aplicados.';
+        diagramEl.innerHTML = buildMoveDiagram(null, this.cubeSize);
+        notationEl.textContent = '✓';
+        stepEl.textContent = `${total} de ${total} movimentos feitos`;
+        titleEl.textContent = 'Pronto, cubo embaralhado';
+        descEl.textContent = 'Confira se o seu cubo está igual ao da tela.';
       }
 
-      // 2. Progress Bar
-      const progressFill = document.getElementById('progress-fill');
-      if (progressFill) {
-        const pct = total > 0 ? (current / total) * 100 : 0;
-        progressFill.style.width = `${pct}%`;
+      if (this.lastRenderedStep !== current) {
+        heroEl.classList.remove('pop');
+        void heroEl.offsetWidth; // reinicia a animação
+        heroEl.classList.add('pop');
+        this.lastRenderedStep = current;
       }
 
-      // 3. Unified Steps Grid
-      const stepsGrid = document.getElementById('steps-grid');
-      stepsGrid.innerHTML = '';
-
-      this.scrambleMoves.forEach((mv, idx) => {
-        const chip = document.createElement('div');
-        chip.className = 'step-chip';
-
-        if (idx < current) chip.classList.add('done');
-        else if (idx === current) chip.classList.add('current');
-
-        chip.innerHTML = `
-          <span class="step-chip-num">${idx + 1}</span>
-          <span class="step-chip-move">${mv}</span>
-        `;
-
-        chip.title = `Ir para o passo ${idx + 1} (${mv})`;
-        chip.addEventListener('click', () => this.jumpToStep(idx + 1));
-        stepsGrid.appendChild(chip);
+      // 2. Sequência
+      (this.stepChips || []).forEach((chip, idx) => {
+        chip.classList.toggle('done', idx < current);
+        chip.classList.toggle('current', idx === current);
+        if (idx === current) chip.setAttribute('aria-current', 'step');
+        else chip.removeAttribute('aria-current');
       });
 
-      // 4. Playback Buttons State
+      // 3. Controles: no fim, o botão principal passa a gerar um novo embaralhamento
       document.getElementById('btn-step-start').disabled = current === 0;
       document.getElementById('btn-step-prev').disabled = current === 0;
-      document.getElementById('btn-step-next').disabled = current >= total;
-      document.getElementById('btn-step-end').disabled = current >= total;
+      document.getElementById('btn-step-end').disabled = finished;
+      document.getElementById('btn-step-next-label').textContent = finished
+        ? 'Novo embaralhamento'
+        : 'Próximo';
+      document.getElementById('btn-step-next').classList.toggle('is-restart', finished);
     }
 
     bindUI() {
-      document.querySelectorAll('.cube-type-btn').forEach((btn) => {
+      const sizeButtons = document.querySelectorAll('.segmented-btn');
+      sizeButtons.forEach((btn) => {
         btn.addEventListener('click', () => {
           const size = parseInt(btn.dataset.size, 10);
           if (size === this.cubeSize) return;
 
-          document.querySelectorAll('.cube-type-btn').forEach((b) => b.classList.remove('active'));
-          btn.classList.add('active');
+          sizeButtons.forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
 
           this.cubeSize = size;
           this.createNewScramble();
@@ -707,21 +820,36 @@ function initApp() {
       });
 
       const copyBtn = document.getElementById('btn-copy-scramble');
+      const copyLabel = copyBtn.querySelector('span');
       copyBtn.addEventListener('click', () => {
         const text = this.scrambleMoves.join(' ');
-        navigator.clipboard.writeText(text).then(() => {
-          const orig = copyBtn.textContent;
-          copyBtn.textContent = 'Copiado!';
-          setTimeout(() => {
-            copyBtn.textContent = orig;
-          }, 1500);
-        });
+        const showResult = (msg, ok) => {
+          copyLabel.textContent = msg;
+          copyBtn.classList.toggle('is-confirmed', ok);
+          clearTimeout(this.copyTimer);
+          this.copyTimer = setTimeout(() => {
+            copyLabel.textContent = 'Copiar notação';
+            copyBtn.classList.remove('is-confirmed');
+          }, 1600);
+        };
+        if (!navigator.clipboard) {
+          showResult('Copie manualmente', false);
+          return;
+        }
+        navigator.clipboard
+          .writeText(text)
+          .then(() => showResult('Notação copiada', true))
+          .catch(() => showResult('Não foi possível copiar', false));
       });
 
       document.getElementById('btn-step-start').addEventListener('click', () => this.jumpToStep(0));
       document.getElementById('btn-step-prev').addEventListener('click', () => this.stepBackward());
       document.getElementById('btn-play-pause').addEventListener('click', () => this.toggleAutoPlay());
       document.getElementById('btn-step-next').addEventListener('click', () => {
+        if (this.currentStepIndex >= this.scrambleMoves.length) {
+          this.createNewScramble();
+          return;
+        }
         this.stopAutoPlay();
         this.stepForward();
       });
@@ -734,7 +862,7 @@ function initApp() {
       speedSlider.addEventListener('input', (e) => {
         const val = parseFloat(e.target.value);
         this.animationDuration = Math.round(350 / val);
-        speedValue.textContent = `${val.toFixed(1)}x`;
+        speedValue.textContent = `${val.toFixed(1).replace('.', ',')}×`;
       });
 
       document.getElementById('btn-reset-camera').addEventListener('click', () => {
@@ -744,11 +872,26 @@ function initApp() {
       const toggleLabelsBtn = document.getElementById('btn-toggle-labels');
       toggleLabelsBtn.addEventListener('click', () => {
         this.show3DLabels = !this.show3DLabels;
-        toggleLabelsBtn.textContent = this.show3DLabels ? 'Rótulos: ON' : 'Rótulos: OFF';
+        toggleLabelsBtn.setAttribute('aria-pressed', String(this.show3DLabels));
       });
 
+      // Depois de um clique com o mouse, tira o foco do botão para que a barra de
+      // espaço continue controlando a reprodução.
+      document.addEventListener('click', (e) => {
+        const btn = e.target.closest('button');
+        if (btn && e.detail > 0) btn.blur();
+      });
+
+      if (window.matchMedia('(pointer: coarse)').matches) {
+        document.getElementById('viewport-hint').textContent =
+          'Arraste para girar o cubo. Use dois dedos para aproximar.';
+      }
+
       window.addEventListener('keydown', (e) => {
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        const tag = e.target.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+        // Espaço num botão focado deve acionar aquele botão, não o "Reproduzir"
+        if (e.code === 'Space' && (tag === 'BUTTON' || tag === 'SUMMARY')) return;
         if (e.code === 'ArrowRight') {
           e.preventDefault();
           this.stopAutoPlay();
@@ -775,10 +918,23 @@ function initApp() {
       }
     }
 
+    // Avisa quando a vista 3D saiu da posição de referência (direção ou rolagem).
+    // O zoom não importa: aproximar não muda qual face é qual.
+    updateReferenceStatus() {
+      const dirOff = this.camera.position.clone().normalize().angleTo(REFERENCE_DIR) > 0.14;
+      const rollOff = this.camera.up.angleTo(WORLD_UP) > 0.2;
+      const off = dirOff || rollOff;
+      if (off === this.viewOffReference) return;
+      this.viewOffReference = off;
+      document.getElementById('view-status').hidden = !off;
+      document.getElementById('btn-reset-camera').classList.toggle('is-alert', off);
+    }
+
     animate() {
       requestAnimationFrame(() => this.animate());
       this.controls.update();
       this.updateFaceLabels();
+      this.updateReferenceStatus();
       this.renderer.render(this.scene, this.camera);
     }
   }
