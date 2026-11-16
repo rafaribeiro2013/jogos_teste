@@ -1,11 +1,12 @@
 // ============================================================================
 // "Casca" do site: alterna entre as seções (Embaralhar / Timer), guarda o tipo
-// de cubo escolhido e liga as duas seções por eventos no `document`:
-//   cube:view           -> seção ativa mudou            (detail: 'scramble' | 'timer')
-//   cube:size           -> tipo de cubo mudou           (detail: 2 | 3)
-//   cube:new-scramble   -> botão "Novo embaralhamento"  (detail: seção ativa)
-//   cube:load-scramble  -> abrir embaralhamento no passo a passo (detail: moves[])
-//   cube:time-scramble  -> usar embaralhamento no timer           (detail: moves[])
+// de cubo escolhido e o embaralhamento atual, que é o MESMO nas duas seções.
+// As seções conversam por eventos no `document`:
+//   cube:view      -> seção ativa mudou                (detail: 'scramble' | 'timer')
+//   cube:size      -> tipo de cubo mudou               (detail: 2 | 3)
+//   cube:scramble  -> embaralhamento atual mudou       (detail: moves[])
+// Para trocar o embaralhamento use shell.newScramble() ou shell.setScramble(moves);
+// nunca gere um embaralhamento só para uma das seções.
 // ============================================================================
 (function () {
   const SIZE_KEY = 'cubescramble.size';
@@ -18,10 +19,16 @@
   const shell = {
     view: 'scramble',
     size: 3,
-    // embaralhamento pedido pelo timer antes de o 3D terminar de carregar
-    pendingScramble: null,
+    scramble: [],
     emit(name, detail) {
       document.dispatchEvent(new CustomEvent(name, { detail }));
+    },
+    setScramble(moves) {
+      shell.scramble = moves.slice();
+      shell.emit('cube:scramble', shell.scramble.slice());
+    },
+    newScramble() {
+      shell.setScramble(window.CubeScramble.generate(shell.size));
     },
     go(view) {
       location.hash = view === 'timer' ? '#timer' : '#embaralhar';
@@ -69,14 +76,17 @@
         /* ignora */
       }
       shell.emit('cube:size', size);
+      shell.newScramble();
     });
   });
 
   document.getElementById('btn-new-scramble').addEventListener('click', () => {
-    shell.emit('cube:new-scramble', shell.view);
+    shell.newScramble();
   });
 
   window.addEventListener('hashchange', applyView);
   renderSize();
+  // Gerado antes das seções carregarem: elas leem shell.scramble ao iniciar
+  shell.scramble = window.CubeScramble.generate(shell.size);
   applyView();
 })();

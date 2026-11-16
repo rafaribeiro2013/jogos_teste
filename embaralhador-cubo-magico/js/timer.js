@@ -316,7 +316,7 @@
     save();
 
     const record = recordsBroken(before, computeStats(list));
-    newScramble();
+    shell.newScramble();
     setState('idle');
     renderAll();
     recordEl.textContent = record;
@@ -345,8 +345,9 @@
     });
   }
 
-  function newScramble() {
-    scramble = window.CubeScramble.generate(shell.size);
+  // O embaralhamento é compartilhado com o passo a passo (js/views.js)
+  function showScramble(moves) {
+    scramble = moves.slice();
     scrambleEl.textContent = scramble.join(' ');
   }
 
@@ -488,27 +489,19 @@
   // ==========================================================================
   // Ligação com o embaralhador passo a passo
   // ==========================================================================
+  // Abre no passo a passo a partir do início; vira o embaralhamento atual das duas seções
   function openStepByStep(moves) {
-    shell.pendingScramble = moves;
-    shell.emit('cube:load-scramble', moves);
+    shell.setScramble(moves);
     shell.go('scramble');
   }
 
-  $('btn-timer-stepbystep').addEventListener('click', () => openStepByStep(scramble.slice()));
+  $('btn-timer-stepbystep').addEventListener('click', () => openStepByStep(scramble));
 
-  document.addEventListener('cube:time-scramble', (e) => {
-    scramble = e.detail.slice();
-    scrambleEl.textContent = scramble.join(' ');
-  });
+  document.addEventListener('cube:scramble', (e) => showScramble(e.detail));
 
   document.addEventListener('cube:size', () => {
     abort();
-    newScramble();
     renderAll();
-  });
-
-  document.addEventListener('cube:new-scramble', (e) => {
-    if (e.detail === 'timer' && phase === 'idle') newScramble();
   });
 
   document.addEventListener('cube:view', (e) => {
@@ -623,7 +616,7 @@
   // Início
   // ==========================================================================
   inspectionBtn.setAttribute('aria-pressed', String(store.settings.inspection));
-  newScramble();
+  showScramble(shell.scramble);
   setState('idle');
   renderAll();
 })();

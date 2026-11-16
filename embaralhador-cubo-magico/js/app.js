@@ -206,8 +206,6 @@ function initApp() {
     return `${faceKey}'`;
   }
 
-  // Gerador compartilhado com o timer (js/scramble.js)
-  const generateScramble = (cubeSize) => window.CubeScramble.generate(cubeSize);
   const shell = window.CubeShell;
 
   // ==========================================================================
@@ -231,8 +229,7 @@ function initApp() {
       this.initFaceLabels();
       this.buildCube(this.cubeSize);
       this.bindUI();
-      this.createNewScramble(shell.pendingScramble);
-      shell.pendingScramble = null;
+      this.createNewScramble(shell.scramble.slice());
       this.animate();
     }
 
@@ -614,10 +611,11 @@ function initApp() {
     // ========================================================================
     // SCRAMBLE & PLAYBACK
     // ========================================================================
-    createNewScramble(customMoves = null) {
+    // Recebe sempre o embaralhamento compartilhado (shell.scramble)
+    createNewScramble(moves) {
       this.stopAutoPlay();
       this.resetCubeToSolved();
-      this.scrambleMoves = customMoves || generateScramble(this.cubeSize);
+      this.scrambleMoves = moves;
       this.currentStepIndex = 0;
       this.buildSequenceUI();
       this.renderScrambleUI();
@@ -766,7 +764,7 @@ function initApp() {
         else chip.removeAttribute('aria-current');
       });
 
-      // 3. Controles: no fim, o botão principal passa a gerar um novo embaralhamento
+      // 3. Controles: no fim, o botão principal leva ao timer com o mesmo embaralhamento
       document.getElementById('btn-step-start').disabled = current === 0;
       document.getElementById('btn-step-prev').disabled = current === 0;
       document.getElementById('btn-step-end').disabled = finished;
@@ -778,18 +776,13 @@ function initApp() {
 
     bindUI() {
       // Cabeçalho e navegação ficam em js/views.js; aqui só reagimos aos eventos
+      // A troca de tamanho vem seguida de um cube:scramble com o novo embaralhamento
       document.addEventListener('cube:size', (e) => {
         this.cubeSize = e.detail;
-        this.createNewScramble();
       });
 
-      document.addEventListener('cube:new-scramble', (e) => {
-        if (e.detail === 'scramble') this.createNewScramble();
-      });
-
-      document.addEventListener('cube:load-scramble', (e) => {
-        shell.pendingScramble = null;
-        this.createNewScramble(e.detail.slice());
+      document.addEventListener('cube:scramble', (e) => {
+        this.createNewScramble(e.detail);
       });
 
       document.addEventListener('cube:view', (e) => {
@@ -843,8 +836,7 @@ function initApp() {
       document.getElementById('btn-play-pause').addEventListener('click', () => this.toggleAutoPlay());
       document.getElementById('btn-step-next').addEventListener('click', () => {
         if (this.currentStepIndex >= this.scrambleMoves.length) {
-          shell.emit('cube:time-scramble', this.scrambleMoves.slice());
-          shell.go('timer');
+          shell.go('timer'); // o timer já mostra este mesmo embaralhamento
           return;
         }
         this.stopAutoPlay();
