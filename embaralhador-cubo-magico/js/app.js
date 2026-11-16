@@ -206,35 +206,9 @@ function initApp() {
     return `${faceKey}'`;
   }
 
-  function generateScramble(cubeSize) {
-    const allowedFaces = cubeSize === 2 ? ['U', 'R', 'F'] : ['U', 'D', 'R', 'L', 'F', 'B'];
-    const modifiers = ['', "'", '2'];
-    const length = cubeSize === 2 ? 11 : 20;
-
-    const moves = [];
-    let lastFace = null;
-    let secondLastFace = null;
-
-    for (let i = 0; i < length; i++) {
-      let candidate;
-      do {
-        candidate = allowedFaces[Math.floor(Math.random() * allowedFaces.length)];
-      } while (
-        candidate === lastFace ||
-        (secondLastFace &&
-          candidate === secondLastFace &&
-          FACES[candidate].axis === FACES[lastFace].axis)
-      );
-
-      const mod = modifiers[Math.floor(Math.random() * modifiers.length)];
-      moves.push(`${candidate}${mod}`);
-
-      secondLastFace = lastFace;
-      lastFace = candidate;
-    }
-
-    return moves;
-  }
+  // Gerador compartilhado com o timer (js/scramble.js)
+  const generateScramble = (cubeSize) => window.CubeScramble.generate(cubeSize);
+  const shell = window.CubeShell;
 
   // ==========================================================================
   // 3D RUBIK'S CUBE SIMULATOR
@@ -242,7 +216,7 @@ function initApp() {
   class RubiksSimulator {
     constructor() {
       this.container = document.getElementById('canvas-container');
-      this.cubeSize = 3;
+      this.cubeSize = shell.size;
       this.cubies = [];
       this.isAnimating = false;
       this.animationQueue = [];
@@ -257,7 +231,8 @@ function initApp() {
       this.initFaceLabels();
       this.buildCube(this.cubeSize);
       this.bindUI();
-      this.createNewScramble();
+      this.createNewScramble(shell.pendingScramble);
+      shell.pendingScramble = null;
       this.animate();
     }
 
@@ -773,7 +748,7 @@ function initApp() {
         notationEl.textContent = '✓';
         stepEl.textContent = `${total} de ${total} movimentos feitos`;
         titleEl.textContent = 'Pronto, cubo embaralhado';
-        descEl.textContent = 'Confira se o seu cubo está igual ao da tela.';
+        descEl.textContent = 'Confira se o seu cubo está igual ao da tela e cronometre a resolução.';
       }
 
       if (this.lastRenderedStep !== current) {
@@ -796,27 +771,48 @@ function initApp() {
       document.getElementById('btn-step-prev').disabled = current === 0;
       document.getElementById('btn-step-end').disabled = finished;
       document.getElementById('btn-step-next-label').textContent = finished
-        ? 'Novo embaralhamento'
+        ? 'Resolver com o timer'
         : 'Próximo';
       document.getElementById('btn-step-next').classList.toggle('is-restart', finished);
     }
 
     bindUI() {
-      const sizeButtons = document.querySelectorAll('.segmented-btn');
-      sizeButtons.forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const size = parseInt(btn.dataset.size, 10);
-          if (size === this.cubeSize) return;
-
-          sizeButtons.forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
-
-          this.cubeSize = size;
-          this.createNewScramble();
-        });
+      // Cabeçalho e navegação ficam em js/views.js; aqui só reagimos aos eventos
+      document.addEventListener('cube:size', (e) => {
+        this.cubeSize = e.detail;
+        this.createNewScramble();
       });
 
-      document.getElementById('btn-new-scramble').addEventListener('click', () => {
-        this.createNewScramble();
+      document.addEventListener('cube:new-scramble', (e) => {
+        if (e.detail === 'scramble') this.createNewScramble();
+      });
+
+      document.addEventListener('cube:load-scramble', (e) => {
+        shell.pendingScramble = null;
+        this.createNewScramble(e.detail.slice());
+      });
+
+      document.addEventListener('cube:view', (e) => {
+        if (e.detail === 'scramble') this.onResize();
+        else this.stopAutoPlay();
+      });
+
+      // Pop-up "Como ler as letras": os mini cubos usam o mesmo desenho do
+      // movimento atual, sempre 3×3 e na posição de referência.
+      const notationDialog = document.getElementById('notation-dialog');
+      document.getElementById('btn-notation-help').addEventListener('click', () => {
+        if (!notationDialog.dataset.drawn) {
+          notationDialog.querySelectorAll('[data-diagram]').forEach((el) => {
+            el.innerHTML = buildMoveDiagram(parseMove(el.dataset.diagram), 3);
+          });
+          notationDialog.dataset.drawn = 'true';
+        }
+        this.stopAutoPlay();
+        notationDialog.showModal();
+      });
+      // Clicar no fundo escuro fecha
+      notationDialog.addEventListener('click', (e) => {
+        if (e.target === notationDialog) notationDialog.close();
       });
 
       const copyBtn = document.getElementById('btn-copy-scramble');
@@ -847,7 +843,8 @@ function initApp() {
       document.getElementById('btn-play-pause').addEventListener('click', () => this.toggleAutoPlay());
       document.getElementById('btn-step-next').addEventListener('click', () => {
         if (this.currentStepIndex >= this.scrambleMoves.length) {
-          this.createNewScramble();
+          shell.emit('cube:time-scramble', this.scrambleMoves.slice());
+          shell.go('timer');
           return;
         }
         this.stopAutoPlay();
@@ -888,6 +885,8 @@ function initApp() {
       }
 
       window.addEventListener('keydown', (e) => {
+        if (shell.view !== 'scramble') return; // o timer usa o teclado do seu jeito
+        if (document.querySelector('dialog[open]')) return; // pop-up aberto
         const tag = e.target.tagName;
         if (tag === 'INPUT' || tag === 'TEXTAREA') return;
         // Espaço num botão focado deve acionar aquele botão, não o "Reproduzir"
@@ -932,6 +931,7 @@ function initApp() {
 
     animate() {
       requestAnimationFrame(() => this.animate());
+      if (shell.view !== 'scramble') return; // seção escondida: economiza bateria
       this.controls.update();
       this.updateFaceLabels();
       this.updateReferenceStatus();

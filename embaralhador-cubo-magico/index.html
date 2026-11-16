@@ -25,6 +25,9 @@
     window.TrackballControls = TrackballControls;
     window.dispatchEvent(new Event('three-ready'));
   </script>
+  <script defer src="js/scramble.js"></script>
+  <script defer src="js/views.js"></script>
+  <script defer src="js/timer.js"></script>
   <script defer src="js/app.js"></script>
 </head>
 <body>
@@ -44,9 +47,16 @@
   </svg>
 
   <header class="app-header">
-    <div class="brand">
-      <svg class="brand-icon" aria-hidden="true"><use href="#cube-orientation" /></svg>
-      <h1>CubeScramble 3D</h1>
+    <div class="header-start">
+      <div class="brand">
+        <svg class="brand-icon" aria-hidden="true"><use href="#cube-orientation" /></svg>
+        <h1>CubeScramble 3D</h1>
+      </div>
+
+      <nav class="view-tabs" aria-label="Seções">
+        <a class="view-tab" href="#embaralhar" data-view="scramble">Embaralhar</a>
+        <a class="view-tab" href="#timer" data-view="timer">Timer</a>
+      </nav>
     </div>
 
     <div class="header-controls">
@@ -62,7 +72,7 @@
     </div>
   </header>
 
-  <main class="app-main">
+  <main class="app-main" id="view-scramble">
     <!-- Cubo 3D -->
     <section class="viewport-panel" aria-label="Visualização 3D do cubo">
       <div id="canvas-container"></div>
@@ -150,26 +160,159 @@
         <ol id="steps-grid" class="steps-grid"></ol>
       </section>
 
-      <details class="notation">
-        <summary>O que significam as letras?</summary>
-        <div class="notation-body">
-          <p>Cada letra é uma posição em relação a você, com o cubo na posição de referência. Se você virar o cubo inteiro, a camada "de cima" passa a ser outra, por isso não vire o cubo durante o embaralhamento.</p>
-          <dl class="notation-faces">
-            <div><dt>U</dt><dd>cima</dd></div>
-            <div><dt>D</dt><dd>baixo</dd></div>
-            <div><dt>F</dt><dd>frente</dd></div>
-            <div><dt>B</dt><dd>trás</dd></div>
-            <div><dt>R</dt><dd>direita</dd></div>
-            <div><dt>L</dt><dd>esquerda</dd></div>
-          </dl>
-          <ul>
-            <li><b>Letra sozinha</b> (R): um quarto de volta no sentido horário, como se você olhasse de frente para aquela face.</li>
-            <li><b>Com apóstrofo</b> (R'): um quarto de volta no sentido anti-horário.</li>
-            <li><b>Com 2</b> (R2): meia volta, para qualquer lado.</li>
-          </ul>
-        </div>
-      </details>
+      <button type="button" id="btn-notation-help" class="notation-trigger">
+        <span class="notation-trigger-icon" aria-hidden="true">?</span>
+        O que significam as letras?
+      </button>
     </aside>
   </main>
+
+  <!-- ===================================================================
+       Timer
+       =================================================================== -->
+  <main class="app-main" id="view-timer" hidden>
+    <section id="timer-stage" class="timer-stage" data-state="idle" aria-label="Timer">
+      <div class="timer-scramble">
+        <p id="timer-scramble-text" class="timer-scramble-text"></p>
+        <button type="button" id="btn-timer-stepbystep" class="chip-btn">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h6" /></svg>
+          Ver passo a passo
+        </button>
+      </div>
+
+      <div class="timer-center">
+        <p id="timer-display" class="timer-display" aria-hidden="true">0.00</p>
+        <p id="timer-hint" class="timer-hint"></p>
+        <p id="timer-record" class="timer-record" hidden></p>
+        <div id="timer-last-actions" class="timer-last-actions" role="group" aria-label="Penalidade do último tempo" hidden>
+          <button type="button" id="btn-last-plus2" class="chip-btn" aria-pressed="false">+2</button>
+          <button type="button" id="btn-last-dnf" class="chip-btn" aria-pressed="false">DNF</button>
+          <button type="button" id="btn-last-delete" class="chip-btn">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13" /></svg>
+            Excluir
+          </button>
+        </div>
+      </div>
+
+      <div class="timer-footer">
+        <button type="button" id="opt-inspection" class="chip-btn" aria-pressed="false">
+          <span class="switch" aria-hidden="true"></span>
+          Inspeção de 15 s (regra WCA)
+        </button>
+      </div>
+
+      <p id="timer-live" class="sr-only" aria-live="polite"></p>
+    </section>
+
+    <aside class="guide-panel timer-side" aria-label="Tempos e estatísticas">
+      <section class="timer-block" aria-labelledby="session-title">
+        <h3 id="session-title" class="block-title">Sessão 3×3</h3>
+        <table class="stats-table">
+          <thead>
+            <tr>
+              <th scope="col"><span class="sr-only">Estatística</span></th>
+              <th scope="col">Atual</th>
+              <th scope="col">Melhor</th>
+            </tr>
+          </thead>
+          <tbody id="timer-stats-body"></tbody>
+        </table>
+        <p id="timer-summary" class="timer-summary"></p>
+        <p class="stats-note">ao5, ao12 e ao100 são médias das últimas resoluções sem o melhor e o pior tempo, como nas competições da WCA.</p>
+      </section>
+
+      <section class="timer-block solves-block" aria-labelledby="solves-title">
+        <div class="sequence-head">
+          <h3 id="solves-title" class="block-title">Tempos</h3>
+          <button type="button" id="btn-clear-session" class="chip-btn">Limpar sessão</button>
+        </div>
+        <div class="solves-head" aria-hidden="true">
+          <span>#</span><span>Tempo</span><span>ao5</span>
+        </div>
+        <ol id="timer-solves" class="solves-list"></ol>
+        <p id="timer-empty" class="timer-empty">Nenhum tempo ainda. Faça a primeira resolução e ela aparece aqui.</p>
+      </section>
+    </aside>
+  </main>
+
+  <!-- Como ler a notação -->
+  <dialog id="notation-dialog" class="solve-dialog notation-dialog" aria-labelledby="notation-title">
+    <form method="dialog" class="solve-dialog-body">
+      <div class="notation-head">
+        <h2 id="notation-title" class="notation-title">Como ler as letras</h2>
+        <button type="submit" class="btn btn-icon notation-close" aria-label="Fechar">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+        </button>
+      </div>
+
+      <p class="notation-intro">Cada letra é uma camada do cubo, sempre com ele na posição de referência: <strong>amarelo em cima</strong> e <strong>azul de frente</strong>. Se você virar o cubo inteiro, a camada "de cima" passa a ser outra, então mantenha essa posição até o fim.</p>
+
+      <section aria-labelledby="notation-faces-title">
+        <h3 id="notation-faces-title" class="notation-subtitle">As seis camadas</h3>
+        <ul class="notation-faces">
+          <li><span class="notation-mini" data-diagram="U"></span><b>U</b><span>cima <i lang="en">(up)</i></span></li>
+          <li><span class="notation-mini" data-diagram="D"></span><b>D</b><span>baixo <i lang="en">(down)</i></span></li>
+          <li><span class="notation-mini" data-diagram="F"></span><b>F</b><span>frente <i lang="en">(front)</i></span></li>
+          <li><span class="notation-mini" data-diagram="B"></span><b>B</b><span>trás <i lang="en">(back)</i></span></li>
+          <li><span class="notation-mini" data-diagram="R"></span><b>R</b><span>direita <i lang="en">(right)</i></span></li>
+          <li><span class="notation-mini" data-diagram="L"></span><b>L</b><span>esquerda <i lang="en">(left)</i></span></li>
+        </ul>
+        <p class="notation-note">A seta mostra o giro da letra sozinha. Setas tracejadas são das camadas escondidas atrás do cubo.</p>
+      </section>
+
+      <section aria-labelledby="notation-mods-title">
+        <h3 id="notation-mods-title" class="notation-subtitle">O que vem depois da letra</h3>
+        <ul class="notation-mods">
+          <li>
+            <span class="notation-mini" data-diagram="R"></span>
+            <b>R</b>
+            <span><strong>Letra sozinha:</strong> um quarto de volta no sentido horário, como se você olhasse de frente para aquela camada.</span>
+          </li>
+          <li>
+            <span class="notation-mini" data-diagram="R'"></span>
+            <b>R'</b>
+            <span><strong>Com apóstrofo:</strong> um quarto de volta no sentido anti-horário.</span>
+          </li>
+          <li>
+            <span class="notation-mini" data-diagram="R2"></span>
+            <b>R2</b>
+            <span><strong>Com 2:</strong> meia volta (180°), para qualquer lado.</span>
+          </li>
+        </ul>
+      </section>
+
+      <button type="submit" class="btn btn-ink notation-ok">Entendi</button>
+    </form>
+  </dialog>
+
+  <!-- Detalhes de um tempo -->
+  <dialog id="solve-dialog" class="solve-dialog" aria-labelledby="dlg-time">
+    <form method="dialog" class="solve-dialog-body">
+      <div>
+        <h2 id="dlg-time" class="dlg-time">0.00</h2>
+        <p id="dlg-meta" class="dlg-meta"></p>
+      </div>
+      <div>
+        <p class="dlg-label">Embaralhamento</p>
+        <p id="dlg-scramble" class="dlg-scramble"></p>
+      </div>
+      <div class="segmented dlg-penalty" role="group" aria-label="Penalidade">
+        <button type="button" class="segmented-btn" data-pen="none" aria-pressed="true">Sem penalidade</button>
+        <button type="button" class="segmented-btn" data-pen="plus2" aria-pressed="false">+2</button>
+        <button type="button" class="segmented-btn" data-pen="dnf" aria-pressed="false">DNF</button>
+      </div>
+      <div class="dlg-actions">
+        <button type="button" id="dlg-delete" class="btn btn-danger">Excluir</button>
+        <button type="button" id="dlg-stepbystep" class="btn">Ver passo a passo</button>
+        <button type="submit" class="btn btn-ink">Fechar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Aviso com opção de desfazer -->
+  <div id="toast" class="toast" role="status" hidden>
+    <span id="toast-msg"></span>
+    <button type="button" id="toast-undo" class="toast-undo">Desfazer</button>
+  </div>
 </body>
 </html>

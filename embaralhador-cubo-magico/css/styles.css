@@ -25,6 +25,11 @@
   /* "O que gira": cor que não existe em nenhum adesivo */
   --turn: #e0187a;
 
+  /* Estados do timer: segurando (vermelho), pronto (verde), aviso de inspeção */
+  --hold: #b71234;
+  --ready: #00843d;
+  --warn: #c84300;
+
   --radius-sticker: 18px;
   --radius-control: 10px;
   --font: 'Archivo', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -44,6 +49,9 @@
     --line-strong: #4a5058;
     --focus: #6f9cf5;
     --on-ink: #111316;
+    --hold: #ff5c74;
+    --ready: #34d17e;
+    --warn: #ff8f40;
     color-scheme: dark;
   }
 }
@@ -59,6 +67,9 @@
   --line-strong: #4a5058;
   --focus: #6f9cf5;
   --on-ink: #111316;
+  --hold: #ff5c74;
+  --ready: #34d17e;
+  --warn: #ff8f40;
   color-scheme: dark;
 }
 
@@ -108,8 +119,18 @@ button {
   stroke-linejoin: round;
 }
 
+[hidden],
 svg[hidden] {
-  display: none;
+  display: none !important;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 kbd {
@@ -145,10 +166,44 @@ kbd {
   flex-shrink: 0;
 }
 
+.header-start {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+
 .brand {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+/* Abas das seções */
+.view-tabs {
+  display: flex;
+  gap: 4px;
+  align-self: stretch;
+}
+
+.view-tab {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  margin-bottom: -11px; /* encosta a linha da aba na borda do cabeçalho */
+  border-bottom: 3px solid transparent;
+  color: var(--ink-soft);
+  font-weight: 700;
+  font-size: 0.95rem;
+  text-decoration: none;
+}
+
+.view-tab:hover {
+  color: var(--ink);
+}
+
+.view-tab[aria-current="page"] {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
 }
 
 .brand-icon {
@@ -157,6 +212,7 @@ kbd {
 }
 
 .brand h1 {
+  white-space: nowrap;
   font-size: 1.05rem;
   font-weight: 800;
   font-stretch: 112%;
@@ -492,40 +548,47 @@ kbd {
   overflow: visible;
 }
 
-.move-diagram .body {
+.move-diagram .body,
+.notation-mini .body {
   fill: #16181c;
   stroke: #16181c;
   stroke-width: 1.4;
   stroke-linejoin: round;
 }
 
-.move-diagram .sticker {
+.move-diagram .sticker,
+.notation-mini .sticker {
   fill: #dfe3e8;
 }
 
-.move-diagram .sticker.on {
+.move-diagram .sticker.on,
+.notation-mini .sticker.on {
   fill: var(--turn);
 }
 
-.move-diagram .arrow-halo {
+.move-diagram .arrow-halo,
+.notation-mini .arrow-halo {
   fill: none;
   stroke: var(--raised);
   stroke-width: 4.6;
   stroke-linecap: round;
 }
 
-.move-diagram .arrow {
+.move-diagram .arrow,
+.notation-mini .arrow {
   fill: none;
   stroke: var(--ink);
   stroke-width: 2.3;
   stroke-linecap: round;
 }
 
-.move-diagram .arrow.hidden-side {
+.move-diagram .arrow.hidden-side,
+.notation-mini .arrow.hidden-side {
   stroke-dasharray: 2.6 2;
 }
 
-.move-diagram .arrow-head {
+.move-diagram .arrow-head,
+.notation-mini .arrow-head {
   fill: var(--ink);
   stroke: var(--raised);
   stroke-width: 0.9;
@@ -732,60 +795,215 @@ kbd {
   opacity: 0.7;
 }
 
-/* Ajuda de notação */
-.notation {
+/* Botão que abre a ajuda de notação */
+.notation-trigger {
   margin-top: auto;
-  border-radius: var(--radius-control);
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 14px 0 8px;
+  border-radius: 999px;
   border: 1px solid var(--line);
   background: var(--raised);
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.notation-trigger:hover {
+  border-color: var(--ink);
+}
+
+.notation-trigger-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--ink);
+  color: var(--on-ink);
+  font-weight: 900;
+  font-size: 0.85rem;
+}
+
+/* Pop-up de notação (reaproveita a base do diálogo de tempos) */
+.notation-dialog {
+  width: min(620px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+}
+
+.notation-dialog .solve-dialog-body {
+  gap: 22px;
+}
+
+.notation-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.notation-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.notation-close {
+  width: 40px;
+  min-height: 40px;
+  margin: -6px -6px 0 0;
+  border-color: transparent;
+}
+
+.notation-intro {
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+  line-height: 1.55;
+  max-width: 62ch;
+}
+
+.notation-intro strong {
+  color: var(--ink);
+}
+
+.notation-subtitle {
+  font-size: 1rem;
+  font-weight: 800;
+  margin-bottom: 12px;
+}
+
+.notation-mini {
+  display: block;
+  width: 76px;
+  height: 76px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  padding: 2px;
+}
+
+/* O mini cubo usa as mesmas classes do diagrama do movimento atual */
+.notation-mini svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.notation-faces {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px 12px;
+}
+
+.notation-faces li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 10px;
+  align-items: center;
+}
+
+.notation-faces .notation-mini {
+  grid-row: 1 / 3;
+}
+
+.notation-faces b,
+.notation-mods b {
+  color: var(--ink);
+  font-size: 1.35rem;
+  font-weight: 900;
+  font-stretch: 125%;
+  line-height: 1;
+}
+
+.notation-faces b {
+  align-self: end;
+}
+
+.notation-faces li > span:last-child {
+  align-self: start;
   font-size: 0.88rem;
   color: var(--ink-soft);
 }
 
-.notation summary {
-  cursor: pointer;
-  padding: 12px 14px;
-  font-weight: 700;
-  color: var(--ink);
-  border-radius: var(--radius-control);
+.notation-faces i {
+  color: var(--ink-faint);
 }
 
-.notation-body {
-  padding: 2px 14px 14px;
+.notation-note {
+  margin-top: 12px;
+  font-size: 0.82rem;
+  color: var(--ink-faint);
+}
+
+.notation-mods {
+  list-style: none;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  line-height: 1.5;
 }
 
-.notation-faces {
+.notation-mods li {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px 12px;
+  grid-template-columns: auto 3.2rem 1fr;
+  align-items: center;
+  gap: 14px;
+  font-size: 0.92rem;
+  color: var(--ink-soft);
+  line-height: 1.45;
 }
 
-.notation-faces div {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.notation-faces dt {
-  font-weight: 900;
-  font-stretch: 125%;
+.notation-mods strong {
   color: var(--ink);
-  min-width: 14px;
 }
 
-.notation-body ul {
-  padding-left: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+.notation-ok {
+  align-self: flex-end;
+  min-width: 120px;
 }
 
-.notation-body b {
-  color: var(--ink);
+@media (max-width: 520px) {
+  .notation-faces {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .notation-mini {
+    width: 64px;
+    height: 64px;
+  }
+
+  /* No celular a letra fica em cima da explicação, ao lado do mini cubo */
+  .notation-mods li {
+    grid-template-columns: auto 1fr;
+    grid-template-areas:
+      "mini letter"
+      "mini text";
+    row-gap: 4px;
+  }
+
+  .notation-mods .notation-mini {
+    grid-area: mini;
+  }
+
+  .notation-mods b {
+    grid-area: letter;
+    font-size: 1.15rem;
+  }
+
+  .notation-mods li > span:last-child {
+    grid-area: text;
+  }
+
+  .notation-ok {
+    align-self: stretch;
+  }
 }
 
 /* ==========================================================================
@@ -891,5 +1109,429 @@ kbd {
   *::after {
     animation: none !important;
     transition: none !important;
+  }
+}
+
+/* ==========================================================================
+   Timer
+   ========================================================================== */
+.timer-stage {
+  position: relative;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 16px;
+  padding: 28px 32px 22px;
+  background: radial-gradient(circle at 50% 50%, var(--raised) 0%, var(--mat) 70%);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: none;
+  cursor: default;
+}
+
+.timer-scramble {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  max-width: 46ch;
+  margin: 0 auto;
+  text-align: center;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.timer-scramble-text {
+  font-size: clamp(1.1rem, 1.9vw, 1.45rem);
+  font-weight: 700;
+  font-stretch: 115%;
+  line-height: 1.55;
+  word-spacing: 0.3em;
+  text-wrap: balance;
+}
+
+.timer-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: 0;
+}
+
+.timer-display {
+  font-size: clamp(4rem, 11vw, 9.5rem);
+  font-weight: 800;
+  font-stretch: 112%;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  transition: color 0.08s linear;
+}
+
+/* Avisos da inspeção (8 s e 12 s, como o juiz anuncia na WCA) */
+.timer-stage[data-warn="8"] .timer-display {
+  color: var(--warn);
+}
+
+.timer-stage[data-warn="12"] .timer-display {
+  color: var(--hold);
+}
+
+/* Segurando = vermelho, pronto = verde (vêm depois para vencer os avisos) */
+.timer-stage[data-state="holding"] .timer-display {
+  color: var(--hold);
+}
+
+.timer-stage[data-state="ready"] .timer-display {
+  color: var(--ready);
+}
+
+.timer-hint {
+  min-height: 1.45em;
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+  text-align: center;
+  max-width: 44ch;
+}
+
+.timer-stage[data-state="running"] .timer-hint {
+  visibility: hidden;
+}
+
+.timer-record {
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--ready);
+  color: var(--on-ink);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.timer-last-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.timer-last-actions .chip-btn[aria-pressed="true"] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--on-ink);
+}
+
+.timer-footer {
+  display: flex;
+  justify-content: center;
+}
+
+/* Modo foco: durante a inspeção e a resolução, só o tempo fica visível */
+.app-header,
+.timer-side,
+.timer-scramble,
+.timer-footer {
+  transition: opacity 0.18s ease;
+}
+
+body.is-timing .app-header,
+body.is-timing .timer-side,
+body.is-timing .timer-scramble,
+body.is-timing .timer-footer {
+  opacity: 0;
+  pointer-events: none;
+}
+
+body.is-timing .timer-stage[data-state="running"] {
+  cursor: none;
+}
+
+/* Painel de estatísticas e tempos */
+.timer-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.block-title {
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.stats-table th,
+.stats-table td {
+  padding: 9px 0;
+  text-align: right;
+  border-bottom: 1px solid var(--line);
+}
+
+.stats-table thead th {
+  padding-top: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.stats-table tbody th {
+  text-align: left;
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.stats-table td {
+  font-size: 1.08rem;
+  font-weight: 700;
+  font-stretch: 110%;
+}
+
+.stats-table td:last-child {
+  width: 34%;
+}
+
+.timer-summary {
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+
+.stats-note {
+  font-size: 0.8rem;
+  color: var(--ink-faint);
+  line-height: 1.4;
+}
+
+.solves-block {
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+.solves-head,
+.solve-row {
+  display: grid;
+  grid-template-columns: 3em 1fr 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.solves-head {
+  padding: 0 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  text-align: right;
+}
+
+.solves-head span:first-child {
+  text-align: left;
+}
+
+.solves-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.solve-row {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.solve-row:hover {
+  background: var(--mat);
+}
+
+.solve-n {
+  text-align: left;
+  font-size: 0.8rem;
+  color: var(--ink-faint);
+}
+
+.solve-time {
+  font-weight: 700;
+  font-stretch: 110%;
+}
+
+.solve-ao5 {
+  color: var(--ink-soft);
+}
+
+.solve-row.is-best .solve-time {
+  color: var(--ready);
+}
+
+.solve-row.is-dnf .solve-time {
+  color: var(--ink-faint);
+}
+
+.timer-empty {
+  padding: 18px 0;
+  font-size: 0.9rem;
+  color: var(--ink-faint);
+}
+
+.chip-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Diálogo de detalhes */
+.solve-dialog {
+  margin: auto;
+  width: min(460px, calc(100vw - 32px));
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0;
+}
+
+.solve-dialog::backdrop {
+  background: rgba(10, 12, 15, 0.5);
+}
+
+.solve-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 24px;
+}
+
+.dlg-time {
+  font-size: 2.6rem;
+  font-weight: 800;
+  font-stretch: 112%;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.dlg-meta {
+  font-size: 0.88rem;
+  color: var(--ink-soft);
+}
+
+.dlg-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  margin-bottom: 4px;
+}
+
+.dlg-scramble {
+  font-weight: 700;
+  font-stretch: 112%;
+  word-spacing: 0.25em;
+  line-height: 1.5;
+}
+
+.dlg-penalty {
+  align-self: flex-start;
+}
+
+.dlg-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dlg-actions .btn-ink {
+  margin-left: auto;
+}
+
+.btn-danger {
+  color: var(--hold);
+}
+
+.btn-danger:hover:not(:disabled) {
+  border-color: var(--hold);
+}
+
+/* Aviso com desfazer */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(20px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: calc(100vw - 32px);
+  padding: 10px 10px 10px 16px;
+  border-radius: 12px;
+  background: var(--ink);
+  color: var(--on-ink);
+  font-size: 0.9rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.toast-undo {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--on-ink);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.toast-undo:hover {
+  background: color-mix(in srgb, var(--on-ink) 14%, transparent);
+}
+
+@media (max-width: 900px) {
+  .header-start {
+    gap: 16px;
+  }
+
+  /* O cabeçalho pode quebrar em duas linhas: a aba não encosta mais na borda */
+  .view-tab {
+    margin-bottom: 0;
+    padding-top: 6px;
+    padding-bottom: 4px;
+  }
+
+  .timer-stage {
+    min-height: 62vh;
+    padding: 20px 16px 16px;
+  }
+
+  .timer-side {
+    border-left: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .header-start {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .view-tab {
+    padding: 0 8px;
+  }
+
+  .dlg-actions .btn {
+    flex: 1;
+  }
+
+  .dlg-actions .btn-ink {
+    margin-left: 0;
   }
 }
